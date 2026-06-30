@@ -14,6 +14,8 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import com.example.techwatch.summarize.ArticleSummary;
 
 public class ReportService {
     private final ArticleRepository articleRepository;
@@ -36,11 +38,13 @@ public class ReportService {
             throws Exception {
         List<Article> articles = articleRepository.findBetween(start, end);
         List<Keyword> keywords = keywordRepository.findAll();
-        WeeklyReport report = new WeeklyReport(periodStart, periodEnd, articles, keywords, summaryRepository.findAll());
+        Map<Long, ArticleSummary> summaries = summaryRepository.findAll();
+        WeeklyReport report = new WeeklyReport(periodStart, periodEnd, articles, keywords, summaries);
         Path path = writer.write(report, reportsDirectory);
         reportRepository.save(periodEnd, path, articles);
-        return new ReportOutput(path, Files.readString(path), articles, keywords);
+        return new ReportOutput(path, Files.readString(path), articles, keywords, summaries);
     }
 
-    public record ReportOutput(Path path, String markdown, List<Article> articles, List<Keyword> keywords) { }
+    public record ReportOutput(Path path, String markdown, List<Article> articles, List<Keyword> keywords,
+                               Map<Long, ArticleSummary> summaries) { }
 }

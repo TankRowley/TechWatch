@@ -58,6 +58,10 @@ public class OpenAiArticleSummarizer implements ArticleSummarizer {
                 あなたは若手Javaバックエンドエンジニア向けの技術リサーチ補助AIです。
                 記事を簡潔に要約し、長期的価値と学習順序を判断してください。
                 広告的な表現を避け、記事本文から確認できる内容だけを出力してください。
+                出力は必ず日本語にしてください。英語記事であっても日本語で要約してください。
+                JSONのキーは英語で構いませんが、値の説明文は日本語にしてください。
+                専門用語は必要に応じて英語を併記して構いません。
+                返答はJSONのみとし、前置きや説明文は付けないでください。
                 """);
         String body = bodyText.substring(0, Math.min(16_000, bodyText.length()));
         root.put("input", "タイトル: " + article.getTitle() + "\nURL: " + article.getUrl()

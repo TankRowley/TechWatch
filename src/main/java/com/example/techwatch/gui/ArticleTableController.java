@@ -1,7 +1,9 @@
 package com.example.techwatch.gui;
 
 import com.example.techwatch.article.Article;
-import javafx.beans.property.ReadOnlyDoubleWrapper;
+import com.example.techwatch.display.DisplayLabelMapper;
+import com.example.techwatch.display.JapaneseSummaryFormatter;
+import com.example.techwatch.summarize.ArticleSummary;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
@@ -10,6 +12,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
@@ -18,36 +21,45 @@ import java.net.URI;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 public class ArticleTableController {
+    private final DisplayLabelMapper labels = new DisplayLabelMapper();
     private final VBox root = new VBox(12);
     private final TableView<Article> table = new TableView<>();
     private final TextArea details = new TextArea();
     private final Button openButton = new Button("ブラウザーで記事を開く");
+    private Map<Long, ArticleSummary> summaries = Map.of();
 
     public ArticleTableController() {
         root.setPadding(new Insets(20));
         Label heading = new Label("記事一覧");
         heading.getStyleClass().add("section-title");
+        Label guidance = new Label("評価点は、情報源・キーワード・学習中・固定・興味領域をもとに計算します。");
+        guidance.getStyleClass().add("guidance");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        table.getColumns().add(column("Score", 80, a -> String.format("%.1f", a.getArticleScore())));
-        table.getColumns().add(column("Label", 110, Article::getImportanceLabel));
-        table.getColumns().add(column("Title", 420, Article::getTitle));
-        table.getColumns().add(column("Source", 150, Article::getSourceName));
-        table.getColumns().add(column("Published", 130, this::published));
+        table.getColumns().add(column("評価点", 75, a -> String.format("%.1f", a.getArticleScore())));
+        table.getColumns().add(column("区分", 95, a -> labels.articleLabel(a.getImportanceLabel())));
+        table.getColumns().add(column("記事タイトル", 430, Article::getTitle));
+        table.getColumns().add(column("情報源", 150, Article::getSourceName));
+        table.getColumns().add(column("公開日", 110, this::published));
         details.setEditable(false);
         details.setWrapText(true);
-        details.setPrefRowCount(6);
-        details.setPromptText("記事を選ぶと概要が表示されます");
+        details.setPrefRowCount(10);
+        details.setPromptText("記事を選ぶと、日本語要約と学習判断が表示されます");
         openButton.setDisable(true);
         openButton.setOnAction(event -> openSelected());
         table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, article) -> show(article));
-        root.getChildren().addAll(heading, table, new Label("概要"), details, openButton);
+        root.getChildren().addAll(heading, guidance, table, new Label("記事の判断メモ"), details, openButton);
         VBox.setVgrow(table, Priority.ALWAYS);
     }
 
     public Node view() { return root; }
-    public void update(List<Article> articles) { table.getItems().setAll(articles); }
+    public void update(List<Article> articles, Map<Long, ArticleSummary> summaries) {
+        this.summaries = summaries == null ? Map.of() : summaries;
+        table.getItems().setAll(articles);
+        show(table.getSelectionModel().getSelectedItem());
+    }
 
     private TableColumn<Article, String> column(String title, double width, java.util.function.Function<Article, String> value) {
         TableColumn<Article, String> column = new TableColumn<>(title);
@@ -63,7 +75,20 @@ public class ArticleTableController {
 
     private void show(Article article) {
         openButton.setDisable(article == null);
-        details.setText(article == null ? "" : article.getSummaryOriginal() + "\n\n" + article.getUrl());
+        if (article == null) { details.clear(); return; }
+        ArticleSummary summary = summaries.get(article.getId());
+        StringBuilder text = new StringBuilder("概要:\n").append(JapaneseSummaryFormatter.visibleSummary(summary));
+        if (summary != null) {
+            if (!summary.technicalPoints().isEmpty()) {
+                text.append("\n\n重要ポイント:\n");
+                summary.technicalPoints().forEach(point -> text.append("・").append(point).append("\n"));
+            }
+            if (!summary.whyItMatters().isBlank()) text.append("\n自分に関係ある理由:\n").append(summary.whyItMatters());
+            text.append("\n\n今読むべきか:\n").append(labels.learningPriority(summary.learningPriority()));
+            if (!summary.prerequisites().isEmpty()) text.append("\n\n前提知識:\n").append(String.join(" / ", summary.prerequisites()));
+        }
+        text.append("\n\nリンク:\n").append(article.getUrl());
+        details.setText(text.toString());
     }
 
     private void openSelected() {

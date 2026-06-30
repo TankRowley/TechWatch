@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.ResultSet;
 
 public class Database {
     private final String jdbcUrl;
@@ -84,10 +85,22 @@ public class Database {
                         final_score REAL NOT NULL DEFAULT 0,
                         first_seen_at TEXT,
                         last_seen_at TEXT,
+                        pinned INTEGER NOT NULL DEFAULT 0,
+                        pinned_at TEXT,
+                        pin_reason TEXT,
+                        learning INTEGER NOT NULL DEFAULT 0,
+                        learning_since TEXT,
+                        learning_reason TEXT,
                         created_at TEXT NOT NULL,
                         updated_at TEXT NOT NULL
                     )
                     """);
+            ensureColumn(connection, "keywords", "pinned", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "keywords", "pinned_at", "TEXT");
+            ensureColumn(connection, "keywords", "pin_reason", "TEXT");
+            ensureColumn(connection, "keywords", "learning", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "keywords", "learning_since", "TEXT");
+            ensureColumn(connection, "keywords", "learning_reason", "TEXT");
             statement.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS keyword_mentions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,9 +136,42 @@ public class Database {
                         UNIQUE(report_id, article_id)
                     )
                     """);
+            statement.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS user_profile (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        display_name TEXT,
+                        primary_goal TEXT,
+                        experience_level TEXT,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """);
+            statement.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS user_interest_categories (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        category TEXT NOT NULL UNIQUE,
+                        enabled INTEGER NOT NULL DEFAULT 1,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """);
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_articles_score ON articles(article_score DESC)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_articles_published ON articles(published_at)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_mentions_observed ON keyword_mentions(observed_at)");
+        }
+    }
+
+    private void ensureColumn(Connection connection, String table, String column, String definition) throws SQLException {
+        boolean exists = false;
+        try (Statement check = connection.createStatement(); ResultSet result = check.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (result.next()) {
+                if (column.equalsIgnoreCase(result.getString("name"))) { exists = true; break; }
+            }
+        }
+        if (!exists) {
+            try (Statement alter = connection.createStatement()) {
+                alter.executeUpdate("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+            }
         }
     }
 }

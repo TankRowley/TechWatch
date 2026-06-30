@@ -7,8 +7,18 @@ import com.example.techwatch.source.Source;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class KeywordBasedArticleScorer implements ArticleScorer {
+    private final Set<String> interestCategories;
+
+    public KeywordBasedArticleScorer() { this(Set.of()); }
+
+    public KeywordBasedArticleScorer(Set<String> interestCategories) {
+        this.interestCategories = interestCategories == null ? Set.of() : interestCategories.stream()
+                .map(String::toLowerCase).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
     @Override
     public ArticleScore score(Article article, Source source, List<KeywordMatch> matches) {
         double score = source.trustScore();
@@ -32,6 +42,12 @@ public class KeywordBasedArticleScorer implements ArticleScorer {
             }
             if ("Core".equalsIgnoreCase(keyword.getStatus())) hasCore = true;
             if (!"Buzz".equalsIgnoreCase(keyword.getStatus())) buzzOnly = false;
+            if (keyword.isLearning()) { score += 2; reasons.add(keyword.getName() + "(学習中) +2"); }
+            if (keyword.isPinned()) { score += 2; reasons.add(keyword.getName() + "(固定) +2"); }
+            if (interestCategories.contains(keyword.getCategory().toLowerCase())) {
+                score += 1;
+                reasons.add(keyword.getCategory() + "(興味領域) +1");
+            }
         }
         if (hasCore) { score += 1; reasons.add("Core技術 +1"); }
         if (buzzOnly) { score -= 2; reasons.add("Buzzのみ -2"); }

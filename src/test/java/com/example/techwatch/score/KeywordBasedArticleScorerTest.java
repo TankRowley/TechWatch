@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,5 +37,20 @@ class KeywordBasedArticleScorerTest {
                 new Source(1L, "Blog", "https://example.com", "rss", 1, "ACTIVE"),
                 new KeywordExtractor().extract(article, List.of(buzz)));
         assertEquals(3.0, score.score());
+    }
+
+    @Test
+    void learningPinnedAndInterestBonusesAreIndependent() {
+        Article article = Article.fetched(1L, "Blog", "Kubernetes guide", "https://example.com/c", Instant.now(), "");
+        Keyword keyword = new Keyword("Kubernetes", "Cloud", "Watch", 4);
+        var matches = new KeywordExtractor().extract(article, List.of(keyword));
+        var base = new KeywordBasedArticleScorer().score(article,
+                new Source(1L, "Blog", "https://example.com", "rss", 1, "ACTIVE"), matches);
+        keyword.setLearning(true, Instant.now(), "学習中");
+        keyword.setPinned(true, Instant.now(), "継続監視");
+        var personalized = new KeywordBasedArticleScorer(Set.of("Cloud")).score(article,
+                new Source(1L, "Blog", "https://example.com", "rss", 1, "ACTIVE"), matches);
+        assertEquals(base.score() + 5, personalized.score());
+        assertEquals("Watch", personalized.label());
     }
 }

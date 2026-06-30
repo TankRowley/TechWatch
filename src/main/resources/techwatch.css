@@ -16,6 +16,12 @@
 .status { -fx-text-fill: #c6d4e5; }
 .section-title { -fx-font-size: 21px; -fx-font-weight: 700; -fx-text-fill: #17233c; }
 .subsection-title { -fx-font-size: 15px; -fx-font-weight: 700; }
+.guidance {
+    -fx-text-fill: #53657d;
+    -fx-padding: 8px 12px;
+    -fx-background-color: #edf4fa;
+    -fx-background-radius: 7px;
+}
 .conclusion {
     -fx-font-size: 15px;
     -fx-line-spacing: 5px;

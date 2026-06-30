@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.Map;
 
 public class ArticleService {
     private final ArticleRepository articleRepository;
@@ -55,7 +56,7 @@ public class ArticleService {
             FeedFetchResult fetchResult = feedFetcher.fetch(source);
             if (!fetchResult.successful()) {
                 failedSources++;
-                log.accept("Source failed: " + source.name() + " (" + fetchResult.errorMessage() + ")");
+                log.accept("情報源の取得に失敗: " + source.name() + "（" + fetchResult.errorMessage() + "）");
                 continue;
             }
             fetched += fetchResult.articles().size();
@@ -91,7 +92,7 @@ public class ArticleService {
                     }
                 } catch (Exception error) {
                     failedArticles++;
-                    log.accept("Article failed: " + article.getTitle() + " (" + error.getMessage() + ")");
+                    log.accept("記事の処理に失敗: " + article.getTitle() + "（" + error.getMessage() + "）");
                 }
             }
         }
@@ -101,5 +102,24 @@ public class ArticleService {
     private boolean shouldFetchBody(ArticleScore score) {
         String skip = System.getenv("TECHWATCH_SKIP_BODY");
         return !"true".equalsIgnoreCase(skip) && score.score() >= 5;
+    }
+
+    public int rescore(List<Article> articles, List<Keyword> keywords, Map<Long, Source> sources,
+                       Consumer<String> log) {
+        int updated = 0;
+        for (Article article : articles) {
+            try {
+                Source source = sources.get(article.getSourceId());
+                if (source == null) continue;
+                ArticleScore score = articleScorer.score(article, source, keywordExtractor.extract(article, keywords));
+                articleRepository.updateAnalysis(article.getId(), score.score(), score.label(), article.getBodyStatus());
+                article.setArticleScore(score.score());
+                article.setImportanceLabel(score.label());
+                updated++;
+            } catch (Exception error) {
+                log.accept("記事の再評価に失敗: " + article.getTitle() + "（" + error.getMessage() + "）");
+            }
+        }
+        return updated;
     }
 }

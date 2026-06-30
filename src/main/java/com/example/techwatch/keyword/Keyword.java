@@ -19,11 +19,27 @@ public class Keyword {
     private double finalScore;
     private Instant firstSeenAt;
     private Instant lastSeenAt;
+    private boolean pinned;
+    private Instant pinnedAt;
+    private String pinReason;
+    private boolean learning;
+    private Instant learningSince;
+    private String learningReason;
 
     public Keyword(Long id, String name, String normalizedName, String category, String status, int weight,
                    double trendScore, double stabilityScore, double marketScore,
                    double learningValueScore, double buzzRiskScore, double finalScore,
                    Instant firstSeenAt, Instant lastSeenAt) {
+        this(id, name, normalizedName, category, status, weight, trendScore, stabilityScore, marketScore,
+                learningValueScore, buzzRiskScore, finalScore, firstSeenAt, lastSeenAt,
+                false, null, "", false, null, "");
+    }
+
+    public Keyword(Long id, String name, String normalizedName, String category, String status, int weight,
+                   double trendScore, double stabilityScore, double marketScore,
+                   double learningValueScore, double buzzRiskScore, double finalScore,
+                   Instant firstSeenAt, Instant lastSeenAt, boolean pinned, Instant pinnedAt,
+                   String pinReason, boolean learning, Instant learningSince, String learningReason) {
         this.id = id;
         this.name = Objects.requireNonNullElse(name, "").trim();
         this.normalizedName = normalizedName == null || normalizedName.isBlank()
@@ -39,6 +55,12 @@ public class Keyword {
         this.finalScore = finalScore;
         this.firstSeenAt = firstSeenAt;
         this.lastSeenAt = lastSeenAt;
+        this.pinned = pinned;
+        this.pinnedAt = pinnedAt;
+        this.pinReason = Objects.requireNonNullElse(pinReason, "");
+        this.learning = learning;
+        this.learningSince = learningSince;
+        this.learningReason = Objects.requireNonNullElse(learningReason, "");
     }
 
     public Keyword(String name, String category, String status, int weight) {
@@ -60,6 +82,24 @@ public class Keyword {
     public double getFinalScore() { return finalScore; }
     public Instant getFirstSeenAt() { return firstSeenAt; }
     public Instant getLastSeenAt() { return lastSeenAt; }
+    public boolean isPinned() { return pinned; }
+    public Instant getPinnedAt() { return pinnedAt; }
+    public String getPinReason() { return pinReason; }
+    public boolean isLearning() { return learning; }
+    public Instant getLearningSince() { return learningSince; }
+    public String getLearningReason() { return learningReason; }
+
+    public void setPinned(boolean pinned, Instant pinnedAt, String pinReason) {
+        this.pinned = pinned;
+        this.pinnedAt = pinnedAt;
+        this.pinReason = Objects.requireNonNullElse(pinReason, "");
+    }
+
+    public void setLearning(boolean learning, Instant learningSince, String learningReason) {
+        this.learning = learning;
+        this.learningSince = learningSince;
+        this.learningReason = Objects.requireNonNullElse(learningReason, "");
+    }
 
     public void applyEvaluation(KeywordEvaluationResult result) {
         this.trendScore = result.trendScore();

@@ -32,8 +32,8 @@ public class KeywordMentionRepository {
         Instant fourWeekStart = weekStart.minusSeconds(21L * 24 * 60 * 60);
         String sql = """
                 SELECT k.id AS keyword_id,
-                  SUM(CASE WHEN m.observed_at>=? AND m.observed_at<? THEN 1 ELSE 0 END) AS current_count,
-                  SUM(CASE WHEN m.observed_at>=? AND m.observed_at<? THEN 1 ELSE 0 END) AS previous_count,
+                  COUNT(DISTINCT CASE WHEN m.observed_at>=? AND m.observed_at<? THEN m.article_id END) AS current_count,
+                  COUNT(DISTINCT CASE WHEN m.observed_at>=? AND m.observed_at<? THEN m.article_id END) AS previous_count,
                   COUNT(DISTINCT CASE WHEN m.observed_at>=? AND m.observed_at<? THEN strftime('%Y-%W',m.observed_at) END) AS active_weeks,
                   COUNT(DISTINCT CASE WHEN m.observed_at>=? AND m.observed_at<? THEN a.source_id END) AS source_diversity,
                   COALESCE(AVG(CASE WHEN m.observed_at>=? AND m.observed_at<? THEN a.article_score END),0) AS average_score

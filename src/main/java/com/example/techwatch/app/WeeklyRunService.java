@@ -13,6 +13,7 @@ import com.example.techwatch.db.KeywordMentionRepository;
 import com.example.techwatch.db.KeywordRepository;
 import com.example.techwatch.db.ReportRepository;
 import com.example.techwatch.db.SourceRepository;
+import com.example.techwatch.db.UserProfileRepository;
 import com.example.techwatch.fetch.FeedFetcher;
 import com.example.techwatch.fetch.RssFeedFetcher;
 import com.example.techwatch.keyword.Keyword;
@@ -32,6 +33,10 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.Set;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class WeeklyRunService {
     private static final ZoneId APP_ZONE = ZoneId.of("Asia/Tokyo");
@@ -60,8 +65,8 @@ public class WeeklyRunService {
         paths.ensureDirectories();
         List<Source> configuredSources = new SourceConfigLoader().load(paths.sourceConfig());
         List<Keyword> configuredKeywords = new KeywordConfigLoader().load(paths.keywordConfig());
-        log.accept("Loaded sources: " + configuredSources.size());
-        log.accept("Loaded keywords: " + configuredKeywords.size());
+        log.accept("情報源を読み込みました: " + configuredSources.size() + "件");
+        log.accept("キーワードを読み込みました: " + configuredKeywords.size() + "件");
 
         Database database = new Database(paths.database());
         database.initialize();
@@ -75,31 +80,36 @@ public class WeeklyRunService {
         ArticleRepository articleRepository = new ArticleRepository(database);
         KeywordMentionRepository mentionRepository = new KeywordMentionRepository(database);
         ArticleSummaryRepository summaryRepository = new ArticleSummaryRepository(database);
+        Set<String> interests = new UserProfileRepository(database).findEnabledInterests();
         ArticleService articleService = new ArticleService(articleRepository, keywordRepository, mentionRepository,
-                summaryRepository, feedFetcher, new KeywordExtractor(), new KeywordBasedArticleScorer(),
+                summaryRepository, feedFetcher, new KeywordExtractor(), new KeywordBasedArticleScorer(interests),
                 bodyExtractor, summarizer);
         ArticleRunStats stats = articleService.collect(sources, keywords, log);
-        log.accept("Fetched articles: " + stats.fetched());
-        log.accept("Saved new articles: " + stats.saved());
-        log.accept("Skipped duplicates: " + stats.duplicates());
-        log.accept("Scored articles: " + stats.scored());
-        log.accept("Keyword mentions: " + stats.keywordMentions());
+        log.accept("取得した記事: " + stats.fetched() + "件");
+        log.accept("新しく保存した記事: " + stats.saved() + "件");
+        log.accept("重複でスキップした記事: " + stats.duplicates() + "件");
+        log.accept("評価した記事: " + stats.scored() + "件");
+        log.accept("検出したキーワード言及: " + stats.keywordMentions() + "件");
 
         LocalDate endDate = LocalDate.now(APP_ZONE);
         LocalDate startDate = endDate.minusDays(6);
         Instant start = startDate.atStartOfDay(APP_ZONE).toInstant();
         Instant end = endDate.plusDays(1).atStartOfDay(APP_ZONE).toInstant();
+        Map<Long, Source> sourceById = sources.stream().collect(Collectors.toMap(Source::id, Function.identity()));
+        int rescored = articleService.rescore(articleRepository.findBetween(start, end), keywords, sourceById, log);
+        log.accept("現在の学習設定で今週の記事を再評価しました: " + rescored + "件");
         KeywordService keywordService = new KeywordService(keywordRepository, mentionRepository, new KeywordEvaluator());
         keywordService.evaluate(start, end);
 
         ReportService reportService = new ReportService(articleRepository, summaryRepository, keywordRepository,
                 new ReportRepository(database), new MarkdownReportWriter());
         ReportService.ReportOutput report = reportService.generate(startDate, endDate, start, end, paths.reportsDirectory());
-        log.accept("Report generated: " + report.path());
+        log.accept("週報を生成しました: " + report.path());
         if (stats.failedSources() > 0 || stats.failedArticles() > 0) {
-            log.accept("Partial failures: sources=" + stats.failedSources() + ", articles=" + stats.failedArticles());
+            log.accept("一部失敗: 情報源=" + stats.failedSources() + "件、記事=" + stats.failedArticles() + "件");
         }
-        return new WeeklyRunResult(report.path(), report.markdown(), report.articles(), report.keywords(), logs, stats);
+        return new WeeklyRunResult(report.path(), report.markdown(), report.articles(), report.keywords(),
+                report.summaries(), logs, stats);
     }
 
     public WeeklyRunResult loadLatest() throws Exception {
@@ -113,6 +123,7 @@ public class WeeklyRunService {
             latest = files.filter(path -> path.getFileName().toString().endsWith(".md")).sorted().reduce((a, b) -> b).orElse(null);
         }
         String markdown = latest == null ? "週報はまだありません。「週報を生成」を押してください。" : Files.readString(latest);
-        return new WeeklyRunResult(latest, markdown, articles, keywords, List.of(), null);
+        return new WeeklyRunResult(latest, markdown, articles, keywords,
+                new ArticleSummaryRepository(database).findAll(), List.of(), null);
     }
 }

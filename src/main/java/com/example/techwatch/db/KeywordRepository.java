@@ -89,12 +89,43 @@ public class KeywordRepository {
         }
     }
 
+    public void updatePinned(long keywordId, boolean pinned, String reason) throws SQLException {
+        String now = Instant.now().toString();
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement("""
+                UPDATE keywords SET pinned=?,pinned_at=?,pin_reason=?,updated_at=? WHERE id=?
+                """)) {
+            statement.setInt(1, pinned ? 1 : 0);
+            statement.setString(2, pinned ? now : null);
+            statement.setString(3, pinned ? (reason == null ? "" : reason.trim()) : "");
+            statement.setString(4, now);
+            statement.setLong(5, keywordId);
+            statement.executeUpdate();
+        }
+    }
+
+    public void updateLearning(long keywordId, boolean learning, String reason) throws SQLException {
+        String now = Instant.now().toString();
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement("""
+                UPDATE keywords SET learning=?,learning_since=?,learning_reason=?,updated_at=? WHERE id=?
+                """)) {
+            statement.setInt(1, learning ? 1 : 0);
+            statement.setString(2, learning ? now : null);
+            statement.setString(3, learning ? (reason == null ? "" : reason.trim()) : "");
+            statement.setString(4, now);
+            statement.setLong(5, keywordId);
+            statement.executeUpdate();
+        }
+    }
+
     private Keyword map(ResultSet result) throws SQLException {
         return new Keyword(result.getLong("id"), result.getString("name"), result.getString("normalized_name"),
                 result.getString("category"), result.getString("status"), result.getInt("weight"),
                 result.getDouble("trend_score"), result.getDouble("stability_score"), result.getDouble("market_score"),
                 result.getDouble("learning_value_score"), result.getDouble("buzz_risk_score"),
                 result.getDouble("final_score"), DbTime.instant(result.getString("first_seen_at")),
-                DbTime.instant(result.getString("last_seen_at")));
+                DbTime.instant(result.getString("last_seen_at")), result.getInt("pinned") == 1,
+                DbTime.instant(result.getString("pinned_at")), result.getString("pin_reason"),
+                result.getInt("learning") == 1, DbTime.instant(result.getString("learning_since")),
+                result.getString("learning_reason"));
     }
 }
