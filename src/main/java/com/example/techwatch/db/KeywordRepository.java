@@ -117,6 +117,28 @@ public class KeywordRepository {
         }
     }
 
+    public void updateHistoryEvaluation(long keywordId, String trendState, String status) throws SQLException {
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement("""
+                UPDATE keywords SET trend_state=?,status=?,updated_at=? WHERE id=?
+                """)) {
+            statement.setString(1, trendState);
+            statement.setString(2, status);
+            statement.setString(3, Instant.now().toString());
+            statement.setLong(4, keywordId);
+            statement.executeUpdate();
+        }
+    }
+
+    public void updateMarketScore(long keywordId, double marketScore) throws SQLException {
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(
+                "UPDATE keywords SET market_score=?,updated_at=? WHERE id=?")) {
+            statement.setDouble(1, marketScore);
+            statement.setString(2, Instant.now().toString());
+            statement.setLong(3, keywordId);
+            statement.executeUpdate();
+        }
+    }
+
     private Keyword map(ResultSet result) throws SQLException {
         return new Keyword(result.getLong("id"), result.getString("name"), result.getString("normalized_name"),
                 result.getString("category"), result.getString("status"), result.getInt("weight"),
@@ -126,6 +148,6 @@ public class KeywordRepository {
                 DbTime.instant(result.getString("last_seen_at")), result.getInt("pinned") == 1,
                 DbTime.instant(result.getString("pinned_at")), result.getString("pin_reason"),
                 result.getInt("learning") == 1, DbTime.instant(result.getString("learning_since")),
-                result.getString("learning_reason"));
+                result.getString("learning_reason"), result.getString("trend_state"));
     }
 }

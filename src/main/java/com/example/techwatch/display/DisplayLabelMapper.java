@@ -36,6 +36,40 @@ public class DisplayLabelMapper {
         };
     }
 
+    public String trendState(String value) {
+        return switch (safe(value)) {
+            case "Rising" -> "急上昇";
+            case "Stable" -> "安定";
+            case "Cooling" -> "減速";
+            case "Dormant" -> "休眠";
+            default -> safe(value);
+        };
+    }
+
+    public String marketLabel(String value) {
+        return switch (safe(value)) {
+            case "Hot" -> "熱い";
+            case "Stable Demand" -> "安定需要";
+            case "Emerging" -> "伸び始め";
+            case "US Leading" -> "米国先行";
+            case "JP Strong" -> "国内需要あり";
+            case "Buzz Only" -> "話題先行";
+            case "Declining Demand" -> "需要低下";
+            case "Unknown", "UNKNOWN" -> "データ不足";
+            default -> safe(value);
+        };
+    }
+
+    public String exploreJudgement(String value) {
+        return switch (safe(value)) {
+            case "NOW" -> "今学ぶ";
+            case "LATER" -> "後で学ぶ";
+            case "NAME_ONLY" -> "名前だけ覚える";
+            case "IGNORE" -> "無視";
+            default -> "未判断";
+        };
+    }
+
     public String category(String value) {
         return switch (safe(value)) {
             case "Backend" -> "バックエンド";
@@ -48,6 +82,11 @@ public class DisplayLabelMapper {
             case "IoT" -> "IoT";
             case "Mobile" -> "モバイル";
             case "Game Development" -> "ゲーム開発";
+            case "DevOps" -> "DevOps・運用監視";
+            case "Development Tools" -> "開発ツール";
+            case "Cloud / IoT" -> "クラウド・IoT";
+            case "AI / Data Engineering" -> "AI・データ基盤";
+            case "Infrastructure / Security" -> "インフラ・セキュリティ";
             case "Java" -> "Java";
             default -> safe(value);
         };

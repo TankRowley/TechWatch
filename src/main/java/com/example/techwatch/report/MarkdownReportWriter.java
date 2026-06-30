@@ -5,6 +5,8 @@ import com.example.techwatch.display.DisplayLabelMapper;
 import com.example.techwatch.display.JapaneseSummaryFormatter;
 import com.example.techwatch.keyword.Keyword;
 import com.example.techwatch.summarize.ArticleSummary;
+import com.example.techwatch.explore.DiscoveredKeyword;
+import com.example.techwatch.market.KeywordMarketStats;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -56,6 +58,9 @@ public class MarkdownReportWriter {
                         && ("Buzz".equalsIgnoreCase(k.getStatus()) || "Decline".equalsIgnoreCase(k.getStatus())))
                 .limit(8).toList();
         keywordBullets(out, later, "明確な後回し候補はありません。");
+        marketSection(out, report);
+        exploreSection(out, report);
+        coolingSection(out, report);
         return out.toString();
     }
 
@@ -95,18 +100,93 @@ public class MarkdownReportWriter {
 
     private void trendSection(StringBuilder out, WeeklyReport report) {
         out.append("## 7. 今週伸びたキーワード\n\n")
-                .append("| キーワード | 状態 | 流行度 | 安定度 | バズリスク | 判断 |\n")
-                .append("|---|---|---:|---:|---:|---|\n");
+                .append("| キーワード | 状態 | 最近の動き | 流行度 | 安定度 | バズリスク | 判断 |\n")
+                .append("|---|---|---|---:|---:|---:|---|\n");
         report.keywords().stream().filter(k -> k.getTrendScore() > 0)
                 .sorted(Comparator.comparingDouble(Keyword::getTrendScore).reversed()).limit(15)
                 .forEach(k -> out.append("| ").append(escape(k.getName())).append(" | ")
-                        .append(labels.keywordStatus(k.getStatus())).append(" | ").append(number(k.getTrendScore()))
+                        .append(labels.keywordStatus(k.getStatus())).append(" | ")
+                        .append(labels.trendState(k.getTrendState())).append(" | ").append(number(k.getTrendScore()))
                         .append(" | ").append(number(k.getStabilityScore())).append(" | ")
                         .append(number(k.getBuzzRiskScore())).append(" | ").append(recommendation(k)).append(" |\n"));
         if (report.keywords().stream().noneMatch(k -> k.getTrendScore() > 0)) {
-            out.append("| - | - | 0 | 0 | 0 | 今週の検出なし |\n");
+            out.append("| - | - | - | 0 | 0 | 0 | 今週の検出なし |\n");
         }
         out.append("\n");
+    }
+
+    private void marketSection(StringBuilder out, WeeklyReport report) {
+        out.append("\n## 12. 求人市場シグナル\n\n");
+        List<Keyword> available = report.keywords().stream()
+                .filter(keyword -> {
+                    KeywordMarketStats value = report.marketStats().get(keyword.getId());
+                    return value != null && (value.usJobCount() > 0 || value.jpJobCount() > 0);
+                })
+                .sorted(Comparator.comparingDouble((Keyword keyword) ->
+                        report.marketStats().get(keyword.getId()).globalMarketScore()).reversed()).limit(10).toList();
+        if (available.isEmpty()) {
+            out.append("求人CSVの履歴がまだありません。設定フォルダの job-market.csv に件数を追加すると評価されます。\n");
+            return;
+        }
+        for (int i = 0; i < available.size(); i++) {
+            Keyword keyword = available.get(i);
+            KeywordMarketStats value = report.marketStats().get(keyword.getId());
+            out.append("### ").append(i + 1).append(". ").append(escape(keyword.getName())).append("\n\n")
+                    .append("市場評価: ").append(labels.marketLabel(value.marketLabel())).append("  \n")
+                    .append("米国求人数: ").append(value.usJobCount()).append("  \n")
+                    .append("日本求人数: ").append(value.jpJobCount()).append("  \n")
+                    .append("判断: ").append(marketReason(keyword, value)).append("\n\n");
+        }
+    }
+
+    private void exploreSection(StringBuilder out, WeeklyReport report) {
+        out.append("## 13. 今週の未知キーワード\n\n");
+        List<DiscoveredKeyword> values = report.discoveredKeywords().stream()
+                .filter(value -> !"IGNORE".equals(value.learningJudgement())).limit(10).toList();
+        if (values.isEmpty()) { out.append("今週の未知キーワードはまだありません。\n\n"); return; }
+        for (int i = 0; i < values.size(); i++) {
+            DiscoveredKeyword value = values.get(i);
+            out.append("### ").append(i + 1).append(". ").append(escape(value.name())).append("\n\n")
+                    .append("分類: ").append(labels.category(value.category())).append("  \n")
+                    .append("判断: ").append(labels.exploreJudgement(value.learningJudgement())).append("  \n")
+                    .append("説明: ").append(value.description()).append("  \n")
+                    .append("前提知識: ").append(value.prerequisites().isEmpty() ? "特になし" : String.join(" / ", value.prerequisites()))
+                    .append("  \nコメント: まず役割を把握し、学習中または固定への昇格はユーザーが判断します。\n\n");
+        }
+    }
+
+    private void coolingSection(StringBuilder out, WeeklyReport report) {
+        out.append("## 14. 減速中・休眠中のキーワード\n\n");
+        List<Keyword> values = report.keywords().stream()
+                .filter(keyword -> "Cooling".equals(keyword.getTrendState()) || "Dormant".equals(keyword.getTrendState()))
+                .limit(12).toList();
+        if (values.isEmpty()) { out.append("減速中・休眠中のキーワードはありません。\n"); return; }
+        for (Keyword keyword : values) {
+            out.append("### ").append(escape(keyword.getName())).append("\n\n")
+                    .append("状態: ").append(labels.keywordStatus(keyword.getStatus())).append("  \n")
+                    .append("最近の動き: ").append(labels.trendState(keyword.getTrendState())).append("  \n")
+                    .append("判断: ").append(recommendation(keyword)).append("  \n")
+                    .append("理由: ").append(historyReason(keyword)).append("\n\n");
+        }
+    }
+
+    private String marketReason(Keyword keyword, KeywordMarketStats value) {
+        return switch (value.marketLabel()) {
+            case "Hot" -> "記事と求人の両方が強く、学習リターンが高い可能性があります。";
+            case "Stable Demand" -> "派手さだけでなく実務需要があり、基礎として継続する価値があります。";
+            case "US Leading" -> "米国需要が先行しています。国内動向を待ちながら監視します。";
+            case "JP Strong" -> "国内求人でも需要が確認でき、実務との接続が期待できます。";
+            case "Buzz Only" -> "記事の話題量に対して求人が弱いため、基礎学習より優先しすぎません。";
+            case "Declining Demand" -> "求人需要が低下しているため、優先度を見直します。";
+            default -> "件数の絶対値を過信せず、記事傾向と合わせて継続観察します。";
+        };
+    }
+
+    private String historyReason(Keyword keyword) {
+        if ("Core".equals(keyword.getStatus())) return "最近の記事が少なくても、基礎技術としての重要性は維持します。";
+        if (keyword.isLearning()) return "話題量だけで学習対象から外さず、現在の学習計画を優先します。";
+        if (keyword.isPinned()) return "ユーザーが固定監視しているため、自動では対象外にしません。";
+        return "過去の履歴に比べ直近の出現が少ないため、監視優先度を下げます。";
     }
 
     private String conclusion(WeeklyReport report) {

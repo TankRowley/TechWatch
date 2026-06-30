@@ -16,6 +16,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import com.example.techwatch.summarize.ArticleSummary;
+import com.example.techwatch.explore.DiscoveredKeyword;
+import com.example.techwatch.market.KeywordMarketStats;
 
 public class ReportService {
     private final ArticleRepository articleRepository;
@@ -36,10 +38,17 @@ public class ReportService {
 
     public ReportOutput generate(LocalDate periodStart, LocalDate periodEnd, Instant start, Instant end, Path reportsDirectory)
             throws Exception {
+        return generate(periodStart, periodEnd, start, end, reportsDirectory, List.of(), Map.of());
+    }
+
+    public ReportOutput generate(LocalDate periodStart, LocalDate periodEnd, Instant start, Instant end,
+                                 Path reportsDirectory, List<DiscoveredKeyword> discovered,
+                                 Map<Long, KeywordMarketStats> marketStats) throws Exception {
         List<Article> articles = articleRepository.findBetween(start, end);
         List<Keyword> keywords = keywordRepository.findAll();
         Map<Long, ArticleSummary> summaries = summaryRepository.findAll();
-        WeeklyReport report = new WeeklyReport(periodStart, periodEnd, articles, keywords, summaries);
+        WeeklyReport report = new WeeklyReport(periodStart, periodEnd, articles, keywords, summaries,
+                discovered, marketStats);
         Path path = writer.write(report, reportsDirectory);
         reportRepository.save(periodEnd, path, articles);
         return new ReportOutput(path, Files.readString(path), articles, keywords, summaries);

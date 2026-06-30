@@ -25,6 +25,7 @@ public class Keyword {
     private boolean learning;
     private Instant learningSince;
     private String learningReason;
+    private String trendState;
 
     public Keyword(Long id, String name, String normalizedName, String category, String status, int weight,
                    double trendScore, double stabilityScore, double marketScore,
@@ -40,6 +41,17 @@ public class Keyword {
                    double learningValueScore, double buzzRiskScore, double finalScore,
                    Instant firstSeenAt, Instant lastSeenAt, boolean pinned, Instant pinnedAt,
                    String pinReason, boolean learning, Instant learningSince, String learningReason) {
+        this(id, name, normalizedName, category, status, weight, trendScore, stabilityScore, marketScore,
+                learningValueScore, buzzRiskScore, finalScore, firstSeenAt, lastSeenAt, pinned, pinnedAt,
+                pinReason, learning, learningSince, learningReason, "Dormant");
+    }
+
+    public Keyword(Long id, String name, String normalizedName, String category, String status, int weight,
+                   double trendScore, double stabilityScore, double marketScore,
+                   double learningValueScore, double buzzRiskScore, double finalScore,
+                   Instant firstSeenAt, Instant lastSeenAt, boolean pinned, Instant pinnedAt,
+                   String pinReason, boolean learning, Instant learningSince, String learningReason,
+                   String trendState) {
         this.id = id;
         this.name = Objects.requireNonNullElse(name, "").trim();
         this.normalizedName = normalizedName == null || normalizedName.isBlank()
@@ -61,6 +73,7 @@ public class Keyword {
         this.learning = learning;
         this.learningSince = learningSince;
         this.learningReason = Objects.requireNonNullElse(learningReason, "");
+        this.trendState = Objects.requireNonNullElse(trendState, "Dormant");
     }
 
     public Keyword(String name, String category, String status, int weight) {
@@ -88,6 +101,7 @@ public class Keyword {
     public boolean isLearning() { return learning; }
     public Instant getLearningSince() { return learningSince; }
     public String getLearningReason() { return learningReason; }
+    public String getTrendState() { return trendState; }
 
     public void setPinned(boolean pinned, Instant pinnedAt, String pinReason) {
         this.pinned = pinned;
@@ -100,6 +114,8 @@ public class Keyword {
         this.learningSince = learningSince;
         this.learningReason = Objects.requireNonNullElse(learningReason, "");
     }
+
+    public void setTrendState(String trendState) { this.trendState = Objects.requireNonNullElse(trendState, "Dormant"); }
 
     public void applyEvaluation(KeywordEvaluationResult result) {
         this.trendScore = result.trendScore();

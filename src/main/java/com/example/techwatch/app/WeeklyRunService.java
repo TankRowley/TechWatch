@@ -14,11 +14,21 @@ import com.example.techwatch.db.KeywordRepository;
 import com.example.techwatch.db.ReportRepository;
 import com.example.techwatch.db.SourceRepository;
 import com.example.techwatch.db.UserProfileRepository;
+import com.example.techwatch.db.DiscoveredKeywordRepository;
+import com.example.techwatch.db.JobMarketSnapshotRepository;
+import com.example.techwatch.db.KeywordMarketStatsRepository;
+import com.example.techwatch.db.KeywordWeeklyStatsRepository;
 import com.example.techwatch.fetch.FeedFetcher;
 import com.example.techwatch.fetch.RssFeedFetcher;
 import com.example.techwatch.keyword.Keyword;
 import com.example.techwatch.keyword.KeywordEvaluator;
 import com.example.techwatch.keyword.KeywordExtractor;
+import com.example.techwatch.keyword.KeywordTrendEvaluator;
+import com.example.techwatch.explore.DiscoveredKeyword;
+import com.example.techwatch.explore.ExploreService;
+import com.example.techwatch.market.KeywordMarketEvaluator;
+import com.example.techwatch.market.KeywordMarketStats;
+import com.example.techwatch.market.ManualCsvJobMarketSource;
 import com.example.techwatch.report.MarkdownReportWriter;
 import com.example.techwatch.score.KeywordBasedArticleScorer;
 import com.example.techwatch.source.Source;
@@ -30,6 +40,8 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.DayOfWeek;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -101,15 +113,35 @@ public class WeeklyRunService {
         KeywordService keywordService = new KeywordService(keywordRepository, mentionRepository, new KeywordEvaluator());
         keywordService.evaluate(start, end);
 
+        LocalDate weekStart = endDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        KeywordHistoryService historyService = new KeywordHistoryService(keywordRepository,
+                new KeywordWeeklyStatsRepository(database), new KeywordTrendEvaluator());
+        keywords = historyService.captureAndEvaluate(weekStart);
+        log.accept("過去26週の履歴から最近の動きを評価しました");
+
+        JobMarketService jobMarketService = new JobMarketService(new ManualCsvJobMarketSource(),
+                new JobMarketSnapshotRepository(database), new KeywordMarketStatsRepository(database),
+                keywordRepository, new KeywordMarketEvaluator());
+        Map<Long, KeywordMarketStats> marketStats = jobMarketService.refresh(paths.jobMarketCsv(), keywords, weekStart);
+        log.accept("求人市場CSVを評価しました: " + marketStats.values().stream()
+                .filter(value -> value.usJobCount() > 0 || value.jpJobCount() > 0).count() + "キーワード");
+
+        List<Article> currentArticles = articleRepository.findBetween(start, end);
+        Map<Long, com.example.techwatch.summarize.ArticleSummary> currentSummaries = summaryRepository.findAll();
+        List<DiscoveredKeyword> discovered = new ExploreService(new DiscoveredKeywordRepository(database))
+                .discover(currentArticles, currentSummaries, keywords);
+        log.accept("探索中の未知キーワード: " + discovered.size() + "件");
+
         ReportService reportService = new ReportService(articleRepository, summaryRepository, keywordRepository,
                 new ReportRepository(database), new MarkdownReportWriter());
-        ReportService.ReportOutput report = reportService.generate(startDate, endDate, start, end, paths.reportsDirectory());
+        ReportService.ReportOutput report = reportService.generate(startDate, endDate, start, end,
+                paths.reportsDirectory(), discovered, marketStats);
         log.accept("週報を生成しました: " + report.path());
         if (stats.failedSources() > 0 || stats.failedArticles() > 0) {
             log.accept("一部失敗: 情報源=" + stats.failedSources() + "件、記事=" + stats.failedArticles() + "件");
         }
         return new WeeklyRunResult(report.path(), report.markdown(), report.articles(), report.keywords(),
-                report.summaries(), logs, stats);
+                report.summaries(), logs, stats, discovered, marketStats);
     }
 
     public WeeklyRunResult loadLatest() throws Exception {
@@ -124,6 +156,8 @@ public class WeeklyRunService {
         }
         String markdown = latest == null ? "週報はまだありません。「週報を生成」を押してください。" : Files.readString(latest);
         return new WeeklyRunResult(latest, markdown, articles, keywords,
-                new ArticleSummaryRepository(database).findAll(), List.of(), null);
+                new ArticleSummaryRepository(database).findAll(), List.of(), null,
+                new DiscoveredKeywordRepository(database).findAllActive(),
+                new KeywordMarketStatsRepository(database).findLatestByKeyword());
     }
 }

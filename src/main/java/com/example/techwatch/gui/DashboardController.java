@@ -22,8 +22,10 @@ public class DashboardController {
     private final Label articleCount = metric("0", "評価した記事");
     private final Label mustReadCount = metric("0", "必読記事");
     private final Label pinnedCount = metric("0", "固定キーワード");
+    private final Label discoveredCount = metric("0", "未知キーワード");
     private final ListView<String> mustRead = new ListView<>();
     private final ListView<String> pinnedKeywords = new ListView<>();
+    private final ListView<String> discoveredKeywords = new ListView<>();
 
     public DashboardController() {
         root.setPadding(new Insets(24));
@@ -32,12 +34,14 @@ public class DashboardController {
         heading.getStyleClass().add("section-title");
         conclusion.setWrapText(true);
         conclusion.getStyleClass().add("conclusion");
-        HBox metrics = new HBox(14, card(articleCount), card(mustReadCount), card(pinnedCount));
+        HBox metrics = new HBox(14, card(articleCount), card(mustReadCount), card(pinnedCount), card(discoveredCount));
         metrics.getChildren().forEach(node -> HBox.setHgrow(node, Priority.ALWAYS));
-        HBox lists = new HBox(18, section("必読記事", mustRead), section("固定キーワードの動き", pinnedKeywords));
+        HBox lists = new HBox(18, section("必読記事", mustRead), section("固定キーワードの動き", pinnedKeywords),
+                section("今週見つかった未知キーワード", discoveredKeywords));
         lists.getChildren().forEach(node -> HBox.setHgrow(node, Priority.ALWAYS));
         mustRead.setPlaceholder(new Label("今週の必読記事はありません"));
         pinnedKeywords.setPlaceholder(new Label("キーワード画面から継続監視したい技術を固定できます"));
+        discoveredKeywords.setPlaceholder(new Label("未知キーワードはまだありません"));
         root.getChildren().addAll(heading, conclusion, metrics, new Separator(), lists);
     }
 
@@ -49,6 +53,7 @@ public class DashboardController {
         mustReadCount.setText(Long.toString(must));
         long pinned = result.keywords().stream().filter(Keyword::isPinned).count();
         pinnedCount.setText(Long.toString(pinned));
+        discoveredCount.setText(Integer.toString(result.discoveredKeywords().size()));
         conclusion.setText(extractConclusion(result.reportMarkdown()));
         mustRead.getItems().setAll(result.articles().stream().filter(a -> "Must Read".equals(a.getImportanceLabel()))
                 .limit(8).map(a -> String.format("%.1f点  %s", a.getArticleScore(), a.getTitle())).toList());
@@ -56,6 +61,8 @@ public class DashboardController {
                 .sorted(Comparator.comparingDouble(Keyword::getTrendScore).reversed())
                 .map(k -> "📌 " + k.getName() + "  ·  " + labels.keywordStatus(k.getStatus())
                         + "  ·  今週" + number(k.getTrendScore()) + "件").toList());
+        discoveredKeywords.getItems().setAll(result.discoveredKeywords().stream().limit(8)
+                .map(value -> value.name() + "  ·  " + labels.exploreJudgement(value.learningJudgement())).toList());
     }
 
     private String extractConclusion(String markdown) {

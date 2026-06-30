@@ -91,6 +91,7 @@ public class Database {
                         learning INTEGER NOT NULL DEFAULT 0,
                         learning_since TEXT,
                         learning_reason TEXT,
+                        trend_state TEXT NOT NULL DEFAULT 'Dormant',
                         created_at TEXT NOT NULL,
                         updated_at TEXT NOT NULL
                     )
@@ -101,6 +102,7 @@ public class Database {
             ensureColumn(connection, "keywords", "learning", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "keywords", "learning_since", "TEXT");
             ensureColumn(connection, "keywords", "learning_reason", "TEXT");
+            ensureColumn(connection, "keywords", "trend_state", "TEXT NOT NULL DEFAULT 'Dormant'");
             statement.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS keyword_mentions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,6 +160,94 @@ public class Database {
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_articles_score ON articles(article_score DESC)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_articles_published ON articles(published_at)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_mentions_observed ON keyword_mentions(observed_at)");
+            statement.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS keyword_weekly_stats (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        keyword_id INTEGER NOT NULL,
+                        week_start TEXT NOT NULL,
+                        mention_count INTEGER NOT NULL DEFAULT 0,
+                        source_count INTEGER NOT NULL DEFAULT 0,
+                        official_source_count INTEGER NOT NULL DEFAULT 0,
+                        high_score_article_count INTEGER NOT NULL DEFAULT 0,
+                        report_included_count INTEGER NOT NULL DEFAULT 0,
+                        average_article_score REAL NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        FOREIGN KEY (keyword_id) REFERENCES keywords(id) ON DELETE CASCADE,
+                        UNIQUE(keyword_id, week_start)
+                    )
+                    """);
+            statement.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS discovered_keywords (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE,
+                        normalized_name TEXT NOT NULL UNIQUE,
+                        category TEXT,
+                        description TEXT,
+                        learning_judgement TEXT NOT NULL DEFAULT 'UNKNOWN',
+                        prerequisites TEXT,
+                        first_seen_at TEXT,
+                        last_seen_at TEXT,
+                        mention_count INTEGER NOT NULL DEFAULT 0,
+                        promoted_to_keyword INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """);
+            statement.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS discovered_keyword_mentions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        discovered_keyword_id INTEGER NOT NULL,
+                        article_id INTEGER NOT NULL,
+                        detected_in TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        FOREIGN KEY (discovered_keyword_id) REFERENCES discovered_keywords(id) ON DELETE CASCADE,
+                        FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
+                        UNIQUE(discovered_keyword_id, article_id, detected_in)
+                    )
+                    """);
+            statement.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS job_market_snapshots (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        keyword_id INTEGER NOT NULL,
+                        region TEXT NOT NULL,
+                        source_name TEXT NOT NULL,
+                        query TEXT NOT NULL,
+                        job_count INTEGER NOT NULL DEFAULT 0,
+                        salary_min INTEGER,
+                        salary_max INTEGER,
+                        salary_median INTEGER,
+                        fetched_at TEXT NOT NULL,
+                        week_start TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        FOREIGN KEY (keyword_id) REFERENCES keywords(id) ON DELETE CASCADE,
+                        UNIQUE(keyword_id, region, source_name, query, week_start)
+                    )
+                    """);
+            statement.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS keyword_market_stats (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        keyword_id INTEGER NOT NULL,
+                        week_start TEXT NOT NULL,
+                        us_job_count INTEGER NOT NULL DEFAULT 0,
+                        jp_job_count INTEGER NOT NULL DEFAULT 0,
+                        us_growth_4w REAL NOT NULL DEFAULT 0,
+                        jp_growth_4w REAL NOT NULL DEFAULT 0,
+                        us_growth_12w REAL NOT NULL DEFAULT 0,
+                        jp_growth_12w REAL NOT NULL DEFAULT 0,
+                        us_market_score REAL NOT NULL DEFAULT 0,
+                        jp_market_score REAL NOT NULL DEFAULT 0,
+                        global_market_score REAL NOT NULL DEFAULT 0,
+                        market_label TEXT NOT NULL DEFAULT 'Unknown',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        FOREIGN KEY (keyword_id) REFERENCES keywords(id) ON DELETE CASCADE,
+                        UNIQUE(keyword_id, week_start)
+                    )
+                    """);
+            statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_keyword_weekly_stats ON keyword_weekly_stats(keyword_id,week_start)");
+            statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_keyword_market_stats ON keyword_market_stats(keyword_id,week_start)");
+            statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_discovered_last_seen ON discovered_keywords(last_seen_at DESC)");
         }
     }
 

@@ -28,6 +28,8 @@ public class TechWatchGuiApp extends Application {
     private final DashboardController dashboard = new DashboardController();
     private final ArticleTableController articles = new ArticleTableController();
     private final KeywordTableController keywords = new KeywordTableController();
+    private final ExploreController explore = new ExploreController();
+    private final JobMarketController jobMarket = new JobMarketController();
     private final TextArea report = textArea();
     private final TextArea logs = textArea();
     private final TabPane tabs = new TabPane();
@@ -43,10 +45,13 @@ public class TechWatchGuiApp extends Application {
         Tab dashboardTab = tab("概要", dashboard.view());
         Tab articlesTab = tab("記事", articles.view());
         Tab keywordsTab = tab("キーワード", keywords.view());
+        Tab exploreTab = tab("探索", explore.view());
+        Tab marketTab = tab("求人市場", jobMarket.view());
         Tab reportsTab = tab("週報", report);
         Tab settingsTab = tab("設定", settings(stage));
         Tab logsTab = tab("ログ", logs);
-        tabs.getTabs().addAll(dashboardTab, articlesTab, keywordsTab, reportsTab, settingsTab, logsTab);
+        tabs.getTabs().addAll(dashboardTab, articlesTab, keywordsTab, exploreTab, marketTab,
+                reportsTab, settingsTab, logsTab);
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         shell.setCenter(tabs);
         Scene scene = new Scene(shell, 1180, 780);
@@ -57,6 +62,7 @@ public class TechWatchGuiApp extends Application {
         stage.setScene(scene);
         stage.show();
         keywords.setOnKeywordsChanged(this::keywordsChanged);
+        explore.setOnChanged(this::loadExisting);
         Platform.runLater(() -> initializeForUser(stage));
 
         runButton.setOnAction(event -> runWeekly());
@@ -121,7 +127,9 @@ public class TechWatchGuiApp extends Application {
         currentResult = result;
         dashboard.update(result);
         articles.update(result.articles(), result.summaries());
-        keywords.update(result.keywords());
+        keywords.update(result.keywords(), result.marketStats());
+        explore.update(result.discoveredKeywords());
+        jobMarket.update(result.keywords(), result.marketStats());
         report.setText(result.reportMarkdown());
         if (!result.logs().isEmpty()) logs.setText(String.join("\n", result.logs()));
     }
@@ -140,6 +148,7 @@ public class TechWatchGuiApp extends Application {
         TextArea locations = textArea();
         locations.setText("データ保存先\n" + paths.home() + "\n\n情報源設定\nconfig/sources.yml または sources.yml"
                 + "\n\nキーワード候補\nconfig/keywords.yml または keywords.yml\n\n日本語AI要約"
+                + "\n\n求人市場CSV\nconfig/job-market.csv"
                 + "\nOPENAI_API_KEY（OpenAI利用時）\nOPENAI_MODEL（LM StudioではロードしたモデルID）"
                 + "\nOPENAI_BASE_URL（LM Studio例: http://localhost:1234/v1）");
         VBox box = new VBox(14, heading, note, setup, locations);
@@ -160,7 +169,8 @@ public class TechWatchGuiApp extends Application {
     private void keywordsChanged(java.util.List<com.example.techwatch.keyword.Keyword> changed) {
         if (currentResult == null) return;
         currentResult = new WeeklyRunResult(currentResult.reportPath(), currentResult.reportMarkdown(),
-                currentResult.articles(), changed, currentResult.summaries(), currentResult.logs(), currentResult.stats());
+                currentResult.articles(), changed, currentResult.summaries(), currentResult.logs(), currentResult.stats(),
+                currentResult.discoveredKeywords(), currentResult.marketStats());
         dashboard.update(currentResult);
     }
 

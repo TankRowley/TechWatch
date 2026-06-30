@@ -34,6 +34,15 @@ class DatabaseMigrationTest {
              var statement = connection.createStatement(); var result = statement.executeQuery("PRAGMA table_info(keywords)")) {
             while (result.next()) columns.add(result.getString("name"));
         }
-        assertTrue(columns.containsAll(Set.of("pinned", "pinned_at", "pin_reason", "learning", "learning_since", "learning_reason")));
+        assertTrue(columns.containsAll(Set.of("pinned", "pinned_at", "pin_reason", "learning", "learning_since",
+                "learning_reason", "trend_state")));
+        Set<String> tables = new HashSet<>();
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + path);
+             var statement = connection.createStatement();
+             var result = statement.executeQuery("SELECT name FROM sqlite_master WHERE type='table'")) {
+            while (result.next()) tables.add(result.getString("name"));
+        }
+        assertTrue(tables.containsAll(Set.of("keyword_weekly_stats", "discovered_keywords",
+                "discovered_keyword_mentions", "job_market_snapshots", "keyword_market_stats")));
     }
 }

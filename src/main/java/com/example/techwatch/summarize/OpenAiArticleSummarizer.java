@@ -142,13 +142,14 @@ public class OpenAiArticleSummarizer implements ArticleSummarizer {
                 広告的な表現を避け、記事本文から確認できる内容だけを出力してください。
                 出力は必ず日本語にしてください。英語記事であっても日本語で要約してください。
                 JSONのキーは英語で構いませんが、値の説明文は日本語にしてください。
+                keywordsには、登録済みかどうかにかかわらず本文の重要な技術語を含めてください。
                 専門用語は必要に応じて英語を併記して構いません。
                 返答はJSONのみとし、前置きや説明文は付けないでください。
                 """;
     }
 
     private String localInstructions() {
-        return "Return JSON only. Use short Japanese values.";
+        return "Return JSON only. Use short Japanese values. Include important technical terms in keywords.";
     }
 
     private String articleInput(Article article, String bodyText) {

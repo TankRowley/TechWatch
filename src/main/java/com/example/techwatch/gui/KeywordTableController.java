@@ -3,6 +3,7 @@ package com.example.techwatch.gui;
 import com.example.techwatch.app.KeywordPreferenceService;
 import com.example.techwatch.display.DisplayLabelMapper;
 import com.example.techwatch.keyword.Keyword;
+import com.example.techwatch.market.KeywordMarketStats;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
@@ -21,6 +22,7 @@ import javafx.scene.layout.VBox;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -32,6 +34,7 @@ public class KeywordTableController {
     private final CheckBox learningOnly = new CheckBox("学習中のみ表示");
     private final CheckBox pinnedOnly = new CheckBox("固定のみ表示");
     private List<Keyword> allKeywords = List.of();
+    private Map<Long, KeywordMarketStats> marketStats = Map.of();
     private Consumer<List<Keyword>> onChanged = ignored -> { };
 
     public KeywordTableController() {
@@ -47,24 +50,32 @@ public class KeywordTableController {
         Button pin = new Button("ピン止め");
         Button unpin = new Button("固定解除");
         Button editReason = new Button("固定理由を編集");
+        Button detail = new Button("詳細とグラフ");
         learning.setOnAction(event -> setLearning(true));
         stopLearning.setOnAction(event -> setLearning(false));
         pin.setOnAction(event -> setPinned(true, true));
         unpin.setOnAction(event -> setPinned(false, false));
         editReason.setOnAction(event -> editPinReason());
+        detail.setOnAction(event -> showDetail());
         learningOnly.setOnAction(event -> applyFilter());
         pinnedOnly.setOnAction(event -> applyFilter());
-        HBox actions = new HBox(8, learning, stopLearning, pin, unpin, editReason, learningOnly, pinnedOnly);
+        HBox actions = new HBox(8, learning, stopLearning, pin, unpin, editReason, detail, learningOnly, pinnedOnly);
 
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.getColumns().add(column("学習中", 70, k -> k.isLearning() ? "学習中" : ""));
         table.getColumns().add(column("固定", 55, k -> k.isPinned() ? "📌" : ""));
         table.getColumns().add(column("キーワード", 155, Keyword::getName));
         table.getColumns().add(column("状態", 90, k -> labels.keywordStatus(k.getStatus())));
+        table.getColumns().add(column("最近の動き", 90, k -> labels.trendState(k.getTrendState())));
+        table.getColumns().add(column("ミニ傾向", 80, this::miniTrend));
         table.getColumns().add(column("流行度", 70, k -> number(k.getTrendScore())));
         table.getColumns().add(column("安定度", 70, k -> number(k.getStabilityScore())));
         table.getColumns().add(column("バズリスク", 85, k -> number(k.getBuzzRiskScore())));
+        table.getColumns().add(column("米国求人", 75, k -> jobs(k).usJobCount() + ""));
+        table.getColumns().add(column("日本求人", 75, k -> jobs(k).jpJobCount() + ""));
+        table.getColumns().add(column("市場評価", 100, k -> labels.marketLabel(jobs(k).marketLabel())));
         table.getColumns().add(column("判断", 220, this::recommendation));
+        table.setOnMouseClicked(event -> { if (event.getClickCount() == 2) showDetail(); });
         root.getChildren().addAll(heading, guidance, actions, table);
         VBox.setVgrow(table, Priority.ALWAYS);
     }
@@ -72,6 +83,10 @@ public class KeywordTableController {
     public Node view() { return root; }
     public void setOnKeywordsChanged(Consumer<List<Keyword>> listener) { onChanged = listener == null ? ignored -> { } : listener; }
     public void update(List<Keyword> keywords) { allKeywords = List.copyOf(keywords); applyFilter(); }
+    public void update(List<Keyword> keywords, Map<Long, KeywordMarketStats> marketStats) {
+        this.marketStats = marketStats == null ? Map.of() : Map.copyOf(marketStats);
+        update(keywords);
+    }
 
     private void applyFilter() {
         table.getItems().setAll(allKeywords.stream()
@@ -149,6 +164,9 @@ public class KeywordTableController {
 
     private String recommendation(Keyword keyword) {
         if (keyword.isLearning()) return "継続学習";
+        KeywordMarketStats market = marketStats.get(keyword.getId());
+        if (market != null && "Buzz Only".equals(market.marketLabel())) return "話題先行。基礎より優先しない";
+        if (market != null && market.globalMarketScore() >= 55) return "実務需要あり。学習候補";
         return switch (keyword.getStatus()) {
             case "Core" -> "基礎として維持";
             case "Watch" -> "継続監視・次の学習候補";
@@ -157,6 +175,26 @@ public class KeywordTableController {
             case "Ignore" -> keyword.isPinned() ? "固定対象として確認" : "対象外";
             default -> "必要時に確認";
         };
+    }
+
+    private KeywordMarketStats jobs(Keyword keyword) {
+        return marketStats.getOrDefault(keyword.getId(), new KeywordMarketStats(keyword.getId(),
+                java.time.LocalDate.MIN, 0, 0, 0, 0, 0, 0, 0, 0, 0, "Unknown"));
+    }
+
+    private String miniTrend(Keyword keyword) {
+        return switch (keyword.getTrendState()) {
+            case "Rising" -> "↗ 急上昇";
+            case "Stable" -> "→ 安定";
+            case "Cooling" -> "↘ 減速";
+            default -> "– 休眠";
+        };
+    }
+
+    private void showDetail() {
+        Keyword keyword = selected();
+        if (keyword != null) new KeywordDetailDialog().show(table.getScene().getWindow(), keyword,
+                marketStats.get(keyword.getId()));
     }
 
     private String number(double value) { return value == Math.rint(value) ? Long.toString(Math.round(value)) : String.format("%.1f", value); }
