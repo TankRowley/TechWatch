@@ -139,7 +139,9 @@ public class TechWatchGuiApp extends Application {
         });
         TextArea locations = textArea();
         locations.setText("データ保存先\n" + paths.home() + "\n\n情報源設定\nconfig/sources.yml または sources.yml"
-                + "\n\nキーワード候補\nconfig/keywords.yml または keywords.yml\n\n日本語AI要約\nOPENAI_API_KEY（任意）\nOPENAI_MODEL（任意、既定: gpt-5-mini）");
+                + "\n\nキーワード候補\nconfig/keywords.yml または keywords.yml\n\n日本語AI要約"
+                + "\nOPENAI_API_KEY（OpenAI利用時）\nOPENAI_MODEL（LM StudioではロードしたモデルID）"
+                + "\nOPENAI_BASE_URL（LM Studio例: http://localhost:1234/v1）");
         VBox box = new VBox(14, heading, note, setup, locations);
         box.setPadding(new Insets(24));
         VBox.setVgrow(locations, Priority.ALWAYS);

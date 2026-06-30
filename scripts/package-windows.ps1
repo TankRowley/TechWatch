@@ -47,7 +47,7 @@ try {
         '--input', $inputDir,
         '--dest', $(if ($Installer) { $distDir } else { $stagingDir }),
         '--name', 'TechWatch',
-        '--app-version', '1.1.0',
+        '--app-version', '1.1.1',
         '--vendor', 'TechWatch',
         '--description', '技術情報を収集・評価し、週報として届けるアプリ',
         '--main-jar', 'techwatch-gui.jar',

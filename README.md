@@ -112,7 +112,7 @@ keywords:
 
 ## AI要約（任意）
 
-APIキーがない場合は「日本語要約は未生成」と明示し、英語概要を日本語要約として扱いません。キーがある場合だけ、本文をOpenAI Responses APIへ送り、JSON Schemaに沿った日本語の要約・重要理由・学習優先度を取得します。APIエラー時もアプリ全体は停止しません。
+接続設定がない場合は「日本語要約は未生成」と明示し、英語概要を日本語要約として扱いません。OpenAIのResponses APIまたはLM StudioのOpenAI互換Chat Completions APIを設定すると、JSON Schemaに沿った日本語の要約・重要理由・学習優先度を取得します。APIエラー時もアプリ全体は停止しません。
 
 ```powershell
 $env:OPENAI_API_KEY = "your-api-key"
@@ -120,7 +120,18 @@ $env:OPENAI_MODEL = "gpt-5-mini" # 省略可
 mvn exec:java
 ```
 
-本文取得自体を止めたい場合は`TECHWATCH_SKIP_BODY=true`を設定します。APIキーはファイルやGitへ保存しないでください。
+LM Studioを使う場合はDeveloper画面でLocal Serverを起動し、ロードしたモデルIDを指定します。ローカル接続ではAPIキーを省略できます。
+
+```powershell
+$model = "qwen3.5-9b-uncensored-hauhaucs-aggressive"
+lms server start -p 1234
+lms load $model --identifier techwatch-local -y
+$env:OPENAI_BASE_URL = "http://localhost:1234/v1"
+$env:OPENAI_MODEL = "techwatch-local"
+mvn exec:java
+```
+
+本文取得自体を止めたい場合は`TECHWATCH_SKIP_BODY=true`を設定します。実際のAPIキーはLM Studio向けのダミー値として使わず、ファイルやGitへ保存しないでください。
 
 ## Windowsアプリを作る
 

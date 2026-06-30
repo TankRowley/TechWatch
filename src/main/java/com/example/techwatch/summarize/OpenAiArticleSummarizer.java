@@ -15,46 +15,128 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class OpenAiArticleSummarizer implements ArticleSummarizer {
-    private static final URI RESPONSES_ENDPOINT = URI.create("https://api.openai.com/v1/responses");
+    private static final String DEFAULT_BASE_URL = "https://api.openai.com/v1";
     private final String apiKey;
     private final String model;
+    private final URI apiEndpoint;
+    private final boolean chatCompletions;
     private final HttpClient httpClient;
     private final ObjectMapper mapper = new ObjectMapper();
     private final ArticleSummarizer fallback;
 
     public OpenAiArticleSummarizer(String apiKey, String model) {
-        this(apiKey, model, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build(),
+        this(apiKey, model, null,
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build(),
                 new NoopArticleSummarizer());
     }
 
     public OpenAiArticleSummarizer(String apiKey, String model, HttpClient httpClient, ArticleSummarizer fallback) {
+        this(apiKey, model, null, httpClient, fallback);
+    }
+
+    public OpenAiArticleSummarizer(String apiKey, String model, String baseUrl) {
+        this(apiKey, model, baseUrl, compatibleHttpClient(baseUrl),
+                new NoopArticleSummarizer());
+    }
+
+    private static HttpClient compatibleHttpClient(String baseUrl) {
+        HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15));
+        if (baseUrl != null && !baseUrl.isBlank()) builder.version(HttpClient.Version.HTTP_1_1);
+        return builder.build();
+    }
+
+    OpenAiArticleSummarizer(String apiKey, String model, String baseUrl, HttpClient httpClient,
+                            ArticleSummarizer fallback) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.model = model == null || model.isBlank() ? "gpt-5-mini" : model.trim();
+        String customEndpoint = baseUrl == null ? "" : baseUrl.trim();
+        this.chatCompletions = !customEndpoint.isBlank() && !stripTrailingSlash(customEndpoint).endsWith("/responses");
+        this.apiEndpoint = chatCompletions ? chatCompletionsEndpoint(customEndpoint) : responsesEndpoint(customEndpoint);
         this.httpClient = httpClient;
         this.fallback = fallback;
     }
 
     @Override
     public ArticleSummary summarize(Article article, String bodyText) {
-        if (apiKey.isBlank() || bodyText == null || bodyText.isBlank()) return fallback.summarize(article, bodyText);
+        if (bodyText == null || bodyText.isBlank()) return fallback.summarize(article, bodyText);
         try {
-            String requestBody = buildRequest(article, bodyText);
-            HttpRequest request = HttpRequest.newBuilder(RESPONSES_ENDPOINT).timeout(Duration.ofSeconds(60))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody)).build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            String requestBody = chatCompletions ? buildChatRequest(article, bodyText) : buildRequest(article, bodyText);
+            HttpRequest.Builder request = HttpRequest.newBuilder(apiEndpoint).timeout(Duration.ofSeconds(60))
+                    .header("Content-Type", "application/json; charset=utf-8")
+                    .header("Accept", "application/json");
+            if (!apiKey.isBlank()) request.header("Authorization", "Bearer " + apiKey);
+            HttpResponse<String> response = httpClient.send(
+                    request.POST(HttpRequest.BodyPublishers.ofString(requestBody)).build(),
+                    HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) return fallback.summarize(article, bodyText);
-            return parseResponse(response.body());
+            return chatCompletions ? parseChatResponse(response.body()) : parseResponse(response.body());
         } catch (Exception ignored) {
             return fallback.summarize(article, bodyText);
         }
     }
 
+    static URI responsesEndpoint(String baseUrl) {
+        String value = baseUrl == null || baseUrl.isBlank() ? DEFAULT_BASE_URL : baseUrl.trim();
+        value = stripTrailingSlash(value);
+        if (!value.endsWith("/responses")) value += "/responses";
+        return httpEndpoint(value);
+    }
+
+    static URI chatCompletionsEndpoint(String baseUrl) {
+        String value = stripTrailingSlash(baseUrl);
+        if (!value.endsWith("/chat/completions")) value += "/chat/completions";
+        return httpEndpoint(value);
+    }
+
+    private static URI httpEndpoint(String value) {
+        URI endpoint = URI.create(value);
+        String scheme = endpoint.getScheme();
+        if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+            throw new IllegalArgumentException("OPENAI_BASE_URLはhttpまたはhttpsで指定してください");
+        }
+        return endpoint;
+    }
+
+    private static String stripTrailingSlash(String value) {
+        String result = value == null ? "" : value.trim();
+        while (result.endsWith("/")) result = result.substring(0, result.length() - 1);
+        return result;
+    }
+
     String buildRequest(Article article, String bodyText) throws Exception {
         ObjectNode root = mapper.createObjectNode();
         root.put("model", model);
-        root.put("instructions", """
+        root.put("instructions", instructions());
+        root.put("input", articleInput(article, bodyText));
+        root.put("max_output_tokens", 900);
+
+        ObjectNode format = root.putObject("text").putObject("format");
+        format.put("type", "json_schema");
+        format.put("name", "techwatch_article_summary");
+        format.put("strict", true);
+        format.set("schema", summarySchema());
+        return mapper.writeValueAsString(root);
+    }
+
+    String buildChatRequest(Article article, String bodyText) throws Exception {
+        ObjectNode root = mapper.createObjectNode();
+        root.put("model", model);
+        ArrayNode messages = root.putArray("messages");
+        messages.addObject().put("role", "system").put("content", localInstructions());
+        messages.addObject().put("role", "user").put("content", localArticleInput(article, bodyText));
+        root.put("max_tokens", 500);
+        root.put("temperature", 0.1);
+        ObjectNode jsonSchema = root.putObject("response_format");
+        jsonSchema.put("type", "json_schema");
+        ObjectNode format = jsonSchema.putObject("json_schema");
+        format.put("name", "techwatch_article_summary");
+        format.put("strict", true);
+        format.set("schema", summarySchema());
+        return mapper.writeValueAsString(root);
+    }
+
+    private String instructions() {
+        return """
                 あなたは若手Javaバックエンドエンジニア向けの技術リサーチ補助AIです。
                 記事を簡潔に要約し、長期的価値と学習順序を判断してください。
                 広告的な表現を避け、記事本文から確認できる内容だけを出力してください。
@@ -62,17 +144,28 @@ public class OpenAiArticleSummarizer implements ArticleSummarizer {
                 JSONのキーは英語で構いませんが、値の説明文は日本語にしてください。
                 専門用語は必要に応じて英語を併記して構いません。
                 返答はJSONのみとし、前置きや説明文は付けないでください。
-                """);
-        String body = bodyText.substring(0, Math.min(16_000, bodyText.length()));
-        root.put("input", "タイトル: " + article.getTitle() + "\nURL: " + article.getUrl()
-                + "\n情報源: " + article.getSourceName() + "\n本文:\n" + body);
-        root.put("max_output_tokens", 900);
+                """;
+    }
 
-        ObjectNode format = root.putObject("text").putObject("format");
-        format.put("type", "json_schema");
-        format.put("name", "techwatch_article_summary");
-        format.put("strict", true);
-        ObjectNode schema = format.putObject("schema");
+    private String localInstructions() {
+        return "Return JSON only. Use short Japanese values.";
+    }
+
+    private String articleInput(Article article, String bodyText) {
+        String body = bodyText.substring(0, Math.min(16_000, bodyText.length()));
+        return "タイトル: " + article.getTitle() + "\nURL: " + article.getUrl()
+                + "\n情報源: " + article.getSourceName() + "\n本文:\n" + body;
+    }
+
+    private String localArticleInput(Article article, String bodyText) {
+        String body = bodyText.substring(0, Math.min(16_000, bodyText.length()));
+        return "Summarize this technical article for a junior Java backend engineer.\nTitle: "
+                + article.getTitle() + "\nURL: " + article.getUrl() + "\nSource: "
+                + article.getSourceName() + "\nArticle:\n" + body;
+    }
+
+    private ObjectNode summarySchema() {
+        ObjectNode schema = mapper.createObjectNode();
         schema.put("type", "object");
         ObjectNode properties = schema.putObject("properties");
         properties.putObject("summary").put("type", "string");
@@ -87,7 +180,7 @@ public class OpenAiArticleSummarizer implements ArticleSummarizer {
         schema.putArray("required").add("summary").add("technicalPoints").add("whyItMatters")
                 .add("learningPriority").add("prerequisites").add("keywords").add("importanceLabel");
         schema.put("additionalProperties", false);
-        return mapper.writeValueAsString(root);
+        return schema;
     }
 
     private void stringArray(ObjectNode properties, String name) {
@@ -111,6 +204,23 @@ public class OpenAiArticleSummarizer implements ArticleSummarizer {
         }
         if (outputText.isBlank()) throw new IllegalArgumentException("Responses APIの本文が空です");
         return parseSummaryJson(outputText);
+    }
+
+    public ArticleSummary parseChatResponse(String responseBody) throws Exception {
+        JsonNode message = mapper.readTree(responseBody).path("choices").path(0).path("message");
+        String outputText = message.path("content").asText("");
+        if (outputText.isBlank()) outputText = message.path("reasoning_content").asText("");
+        if (outputText.isBlank()) throw new IllegalArgumentException("Chat Completions APIの本文が空です");
+        return parseSummaryJson(stripCodeFence(outputText));
+    }
+
+    private String stripCodeFence(String text) {
+        String value = text.trim();
+        if (!value.startsWith("```")) return value;
+        int firstLine = value.indexOf('\n');
+        int closing = value.lastIndexOf("```");
+        if (firstLine < 0 || closing <= firstLine) return value;
+        return value.substring(firstLine + 1, closing).trim();
     }
 
     public ArticleSummary parseSummaryJson(String json) throws Exception {
