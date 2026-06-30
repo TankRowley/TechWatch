@@ -15,10 +15,21 @@ public class Article {
     private String bodyStatus;
     private double articleScore;
     private String importanceLabel;
+    private boolean archived;
+    private boolean savedByUser;
+    private boolean cleanupProtected;
 
     public Article(Long id, Long sourceId, String sourceName, String title, String url,
                    Instant publishedAt, Instant fetchedAt, String summaryOriginal,
                    String bodyStatus, double articleScore, String importanceLabel) {
+        this(id, sourceId, sourceName, title, url, publishedAt, fetchedAt, summaryOriginal,
+                bodyStatus, articleScore, importanceLabel, false, false, false);
+    }
+
+    public Article(Long id, Long sourceId, String sourceName, String title, String url,
+                   Instant publishedAt, Instant fetchedAt, String summaryOriginal,
+                   String bodyStatus, double articleScore, String importanceLabel,
+                   boolean archived, boolean savedByUser, boolean cleanupProtected) {
         this.id = id;
         this.sourceId = sourceId;
         this.sourceName = Objects.requireNonNullElse(sourceName, "Unknown source");
@@ -30,6 +41,9 @@ public class Article {
         this.bodyStatus = Objects.requireNonNullElse(bodyStatus, "SKIPPED");
         this.articleScore = articleScore;
         this.importanceLabel = Objects.requireNonNullElse(importanceLabel, "UNRATED");
+        this.archived = archived;
+        this.savedByUser = savedByUser;
+        this.cleanupProtected = cleanupProtected;
     }
 
     public static Article fetched(Long sourceId, String sourceName, String title, String url,
@@ -55,4 +69,8 @@ public class Article {
     public void setArticleScore(double articleScore) { this.articleScore = articleScore; }
     public String getImportanceLabel() { return importanceLabel; }
     public void setImportanceLabel(String importanceLabel) { this.importanceLabel = importanceLabel; }
+    public boolean isArchived() { return archived; }
+    public boolean isSavedByUser() { return savedByUser; }
+    public void setSavedByUser(boolean savedByUser) { this.savedByUser = savedByUser; }
+    public boolean isCleanupProtected() { return cleanupProtected; }
 }

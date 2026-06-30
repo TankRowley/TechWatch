@@ -135,6 +135,33 @@ week_start,keyword,region,source,query,job_count
 
 「キーワード」タブで行をダブルクリックすると、最近の動き、求人評価、判断理由、過去12週の記事出現数・米国求人数・日本求人数、関連記事を確認できます。
 
+### データ保存期間と整理
+
+`retention.yml`で記事本文、raw HTML、実行ログ、記事メタデータ、求人詳細などの保存日数を設定できます。週報生成後には古いデータを自動整理し、「設定」タブの「今すぐ整理する」から手動実行することもできます。
+
+```yaml
+retention:
+  articleBodyDays: 60
+  rawHtmlDays: 30
+  executionLogDays: 30
+  unselectedArticleDays: 180
+  articleMetadataDays: 365
+  jobSnapshotDays: 365
+  htmlReportDays: 365
+  keepMarkdownReports: true
+  keepWeeklyKeywordStats: true
+  keepKeywordMarketStats: true
+```
+
+固定・学習中キーワードに関係する記事、週報採用記事、評価点8以上の記事、「この記事を保存する」で指定した記事は整理から保護されます。記事を削除する前に対応する週次統計が作成済みかも確認します。Markdown週報、週次キーワード統計、市場統計は削除しません。
+
+CLIでは整理とSQLiteの圧縮を個別に実行できます。`VACUUM`はDB全体を再構築するため、頻繁には実行せず月1回程度が目安です。
+
+```powershell
+java -jar target/techwatch.jar cleanup
+java -jar target/techwatch.jar vacuum
+```
+
 ## AI要約（任意）
 
 接続設定がない場合は「日本語要約は未生成」と明示し、英語概要を日本語要約として扱いません。OpenAIのResponses APIまたはLM StudioのOpenAI互換Chat Completions APIを設定すると、JSON Schemaに沿った日本語の要約・重要理由・学習優先度を取得します。APIエラー時もアプリ全体は停止しません。
@@ -200,7 +227,7 @@ mvn test
 
 - 本文抽出は汎用的なHTMLヒューリスティックであり、サイト別最適化は未実装
 - 求人市場・GitHub Trending・Hacker Newsのデータは未統合
-- Settingsタブからの設定編集、グラフ、通知、自動更新は後続フェーズ
+- 設定値のGUI直接編集、通知、自動更新は後続フェーズ
 - AI評価は記事要約に使用し、記事スコア自体は説明可能なルールベースを維持
 
 次の改善候補は、情報源の採用率評価、サイト別本文抽出、学習プロフィール、キーワード推移グラフです。

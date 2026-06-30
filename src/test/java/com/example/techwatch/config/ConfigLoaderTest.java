@@ -28,6 +28,24 @@ class ConfigLoaderTest {
     }
 
     @Test
+    void loadsRetentionPolicyAndUsesSafeDefaults() throws Exception {
+        Path retention = temp.resolve("retention.yml");
+        Files.writeString(retention, """
+                retention:
+                  articleBodyDays: 45
+                  executionLogDays: 14
+                  keepMarkdownReports: true
+                """);
+
+        RetentionPolicy policy = new RetentionConfigLoader().load(retention);
+
+        assertEquals(45, policy.articleBodyDays());
+        assertEquals(14, policy.executionLogDays());
+        assertEquals(365, policy.articleMetadataDays());
+        assertTrue(policy.keepMarkdownReports());
+    }
+
+    @Test
     void packagedApplicationUsesUserDataDirectory() {
         System.setProperty("techwatch.packaged", "true");
         try {

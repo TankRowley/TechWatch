@@ -5,8 +5,10 @@ import com.example.techwatch.body.BodyExtractor;
 import com.example.techwatch.body.SimpleBodyExtractor;
 import com.example.techwatch.config.AppPaths;
 import com.example.techwatch.config.KeywordConfigLoader;
+import com.example.techwatch.config.RetentionConfigLoader;
 import com.example.techwatch.config.SourceConfigLoader;
 import com.example.techwatch.db.ArticleRepository;
+import com.example.techwatch.db.ArticleBodyRepository;
 import com.example.techwatch.db.ArticleSummaryRepository;
 import com.example.techwatch.db.Database;
 import com.example.techwatch.db.KeywordMentionRepository;
@@ -93,7 +95,8 @@ public class WeeklyRunService {
         KeywordMentionRepository mentionRepository = new KeywordMentionRepository(database);
         ArticleSummaryRepository summaryRepository = new ArticleSummaryRepository(database);
         Set<String> interests = new UserProfileRepository(database).findEnabledInterests();
-        ArticleService articleService = new ArticleService(articleRepository, keywordRepository, mentionRepository,
+        ArticleService articleService = new ArticleService(articleRepository, new ArticleBodyRepository(database),
+                keywordRepository, mentionRepository,
                 summaryRepository, feedFetcher, new KeywordExtractor(), new KeywordBasedArticleScorer(interests),
                 bodyExtractor, summarizer);
         ArticleRunStats stats = articleService.collect(sources, keywords, log);
@@ -137,11 +140,28 @@ public class WeeklyRunService {
         ReportService.ReportOutput report = reportService.generate(startDate, endDate, start, end,
                 paths.reportsDirectory(), discovered, marketStats);
         log.accept("週報を生成しました: " + report.path());
+        try {
+            CleanupResult cleanup = new CleanupService(database, paths,
+                    new RetentionConfigLoader().load(paths.retentionConfig())).cleanup();
+            log.accept(cleanup.summaryJapanese());
+        } catch (Exception error) {
+            log.accept("古いデータの整理をスキップしました: " + error.getMessage());
+        }
         if (stats.failedSources() > 0 || stats.failedArticles() > 0) {
             log.accept("一部失敗: 情報源=" + stats.failedSources() + "件、記事=" + stats.failedArticles() + "件");
         }
+        writeExecutionLog(logs);
         return new WeeklyRunResult(report.path(), report.markdown(), report.articles(), report.keywords(),
                 report.summaries(), logs, stats, discovered, marketStats);
+    }
+
+    private void writeExecutionLog(List<String> logs) {
+        try {
+            String timestamp = Instant.now().toString().replace(':', '-');
+            Files.writeString(paths.logsDirectory().resolve("run-" + timestamp + ".log"), String.join("\n", logs));
+        } catch (Exception ignored) {
+            // ログ保存の失敗だけで週報生成を失敗させない。
+        }
     }
 
     public WeeklyRunResult loadLatest() throws Exception {

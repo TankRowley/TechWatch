@@ -5,6 +5,7 @@ import com.example.techwatch.article.ArticleScore;
 import com.example.techwatch.body.BodyExtractionResult;
 import com.example.techwatch.body.BodyExtractor;
 import com.example.techwatch.db.ArticleRepository;
+import com.example.techwatch.db.ArticleBodyRepository;
 import com.example.techwatch.db.ArticleSummaryRepository;
 import com.example.techwatch.db.KeywordMentionRepository;
 import com.example.techwatch.db.KeywordRepository;
@@ -26,6 +27,7 @@ import java.util.Map;
 
 public class ArticleService {
     private final ArticleRepository articleRepository;
+    private final ArticleBodyRepository bodyRepository;
     private final KeywordRepository keywordRepository;
     private final KeywordMentionRepository mentionRepository;
     private final ArticleSummaryRepository summaryRepository;
@@ -35,11 +37,13 @@ public class ArticleService {
     private final BodyExtractor bodyExtractor;
     private final ArticleSummarizer summarizer;
 
-    public ArticleService(ArticleRepository articleRepository, KeywordRepository keywordRepository,
+    public ArticleService(ArticleRepository articleRepository, ArticleBodyRepository bodyRepository,
+                          KeywordRepository keywordRepository,
                           KeywordMentionRepository mentionRepository, ArticleSummaryRepository summaryRepository,
                           FeedFetcher feedFetcher, KeywordExtractor keywordExtractor, ArticleScorer articleScorer,
                           BodyExtractor bodyExtractor, ArticleSummarizer summarizer) {
         this.articleRepository = articleRepository;
+        this.bodyRepository = bodyRepository;
         this.keywordRepository = keywordRepository;
         this.mentionRepository = mentionRepository;
         this.summaryRepository = summaryRepository;
@@ -77,6 +81,7 @@ public class ArticleService {
                             : BodyExtractionResult.skipped();
                     persisted.setBodyStatus(body.status().name());
                     articleRepository.updateAnalysis(persisted.getId(), score.score(), score.label(), body.status().name());
+                    bodyRepository.save(persisted.getId(), body.bodyText(), body.rawHtml(), persisted.getFetchedAt());
                     ArticleSummary summary = summarizer.summarize(persisted,
                             body.bodyText().isBlank() ? persisted.getSummaryOriginal() : body.bodyText());
                     summaryRepository.save(persisted.getId(), summary);

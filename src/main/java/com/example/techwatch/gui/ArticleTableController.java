@@ -1,6 +1,9 @@
 package com.example.techwatch.gui;
 
 import com.example.techwatch.article.Article;
+import com.example.techwatch.config.AppPaths;
+import com.example.techwatch.db.ArticleRepository;
+import com.example.techwatch.db.Database;
 import com.example.techwatch.display.DisplayLabelMapper;
 import com.example.techwatch.display.JapaneseSummaryFormatter;
 import com.example.techwatch.summarize.ArticleSummary;
@@ -14,6 +17,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.awt.Desktop;
@@ -29,6 +33,7 @@ public class ArticleTableController {
     private final TableView<Article> table = new TableView<>();
     private final TextArea details = new TextArea();
     private final Button openButton = new Button("ブラウザーで記事を開く");
+    private final Button saveButton = new Button("この記事を保存する");
     private Map<Long, ArticleSummary> summaries = Map.of();
 
     public ArticleTableController() {
@@ -43,14 +48,18 @@ public class ArticleTableController {
         table.getColumns().add(column("記事タイトル", 430, Article::getTitle));
         table.getColumns().add(column("情報源", 150, Article::getSourceName));
         table.getColumns().add(column("公開日", 110, this::published));
+        table.getColumns().add(column("保存", 70, a -> a.isSavedByUser() ? "保存中" : "-"));
         details.setEditable(false);
         details.setWrapText(true);
         details.setPrefRowCount(10);
         details.setPromptText("記事を選ぶと、日本語要約と学習判断が表示されます");
         openButton.setDisable(true);
         openButton.setOnAction(event -> openSelected());
+        saveButton.setDisable(true);
+        saveButton.setOnAction(event -> toggleSaved());
         table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, article) -> show(article));
-        root.getChildren().addAll(heading, guidance, table, new Label("記事の判断メモ"), details, openButton);
+        root.getChildren().addAll(heading, guidance, table, new Label("記事の判断メモ"), details,
+                new HBox(10, openButton, saveButton));
         VBox.setVgrow(table, Priority.ALWAYS);
     }
 
@@ -75,6 +84,8 @@ public class ArticleTableController {
 
     private void show(Article article) {
         openButton.setDisable(article == null);
+        saveButton.setDisable(article == null);
+        saveButton.setText(article != null && article.isSavedByUser() ? "保存を解除する" : "この記事を保存する");
         if (article == null) { details.clear(); return; }
         ArticleSummary summary = summaries.get(article.getId());
         StringBuilder text = new StringBuilder("概要:\n").append(JapaneseSummaryFormatter.visibleSummary(summary));
@@ -96,5 +107,22 @@ public class ArticleTableController {
         if (article == null) return;
         try { if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(URI.create(article.getUrl())); }
         catch (Exception error) { details.appendText("\n\nURLを開けませんでした: " + error.getMessage()); }
+    }
+
+    private void toggleSaved() {
+        Article article = table.getSelectionModel().getSelectedItem();
+        if (article == null || article.getId() == null) return;
+        boolean next = !article.isSavedByUser();
+        try {
+            Database database = new Database(AppPaths.detect().database());
+            database.initialize();
+            new ArticleRepository(database).setSavedByUser(article.getId(), next);
+            article.setSavedByUser(next);
+            table.refresh();
+            show(article);
+            details.appendText(next ? "\n\nこの記事はデータ整理から保護されます。" : "\n\n記事の保存指定を解除しました。");
+        } catch (Exception error) {
+            details.appendText("\n\n保存状態を変更できませんでした: " + error.getMessage());
+        }
     }
 }

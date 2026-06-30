@@ -47,7 +47,7 @@ try {
         '--input', $inputDir,
         '--dest', $(if ($Installer) { $distDir } else { $stagingDir }),
         '--name', 'TechWatch',
-        '--app-version', '1.2.0',
+        '--app-version', '1.3.0',
         '--vendor', 'TechWatch',
         '--description', '技術情報を収集・評価し、週報として届けるアプリ',
         '--main-jar', 'techwatch-gui.jar',
@@ -82,6 +82,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $root 'sources.yml') -Destination (Join-Path $appHome 'config\sources.yml')
         Copy-Item -LiteralPath (Join-Path $root 'keywords.yml') -Destination (Join-Path $appHome 'config\keywords.yml')
         Copy-Item -LiteralPath (Join-Path $root 'job-market.csv') -Destination (Join-Path $appHome 'config\job-market.csv')
+        Copy-Item -LiteralPath (Join-Path $root 'retention.yml') -Destination (Join-Path $appHome 'config\retention.yml')
         Remove-WorkspaceDirectory $stagingDir
         Write-Host "Created: $(Join-Path $appHome 'TechWatch.exe')"
     }

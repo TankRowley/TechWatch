@@ -29,12 +29,13 @@ public class SimpleBodyExtractor implements BodyExtractor {
         if (url == null || url.isBlank()) return BodyExtractionResult.skipped();
         try {
             Document document = documentLoader.apply(url);
+            String rawHtml = document.outerHtml();
             document.select("script,style,nav,footer,header,aside,form,.advertisement,.ads,.related,.social-share").remove();
             Element content = first(document, "article", "main", "[role=main]", ".post-content", ".entry-content", ".article-body");
             String text = (content == null ? document.body() : content).text().replaceAll("\\s+", " ").trim();
             if (text.length() < 100) return BodyExtractionResult.failed("本文候補が短すぎます");
             BodyStatus status = text.length() >= 500 ? BodyStatus.SUCCESS : BodyStatus.PARTIAL;
-            return new BodyExtractionResult(status, text, "");
+            return new BodyExtractionResult(status, text, rawHtml, "");
         } catch (RuntimeException error) {
             Throwable cause = error instanceof BodyLoadException && error.getCause() != null ? error.getCause() : error;
             return BodyExtractionResult.failed(cause.getClass().getSimpleName() + ": " + cause.getMessage());

@@ -2,6 +2,7 @@ package com.example.techwatch.app;
 
 import com.example.techwatch.article.Article;
 import com.example.techwatch.body.BodyExtractionResult;
+import com.example.techwatch.body.BodyStatus;
 import com.example.techwatch.config.AppPaths;
 import com.example.techwatch.fetch.FeedFetchResult;
 import com.example.techwatch.source.Source;
@@ -27,12 +28,20 @@ class WeeklyRunServiceTest {
                 Article.fetched(source.id(), source.name(), "Java architecture", "https://example.com/article",
                         Instant.now(), "A practical Java implementation")));
         WeeklyRunService service = new WeeklyRunService(new AppPaths(temp), fetcher,
-                url -> BodyExtractionResult.skipped(), new NoopArticleSummarizer());
+                url -> new BodyExtractionResult(BodyStatus.SUCCESS, "A sufficiently detailed Java article body",
+                        "<html><body>raw source</body></html>", ""), new NoopArticleSummarizer());
 
         WeeklyRunResult result = service.runWeekly(line -> { });
 
         assertEquals(1, result.stats().saved());
         assertTrue(Files.exists(result.reportPath()));
         assertTrue(result.reportMarkdown().contains("Java architecture"));
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("techwatch.db"));
+             var statement = connection.createStatement();
+             var body = statement.executeQuery("SELECT body_text,raw_html FROM article_bodies")) {
+            assertTrue(body.next());
+            assertTrue(body.getString("body_text").contains("Java article body"));
+            assertTrue(body.getString("raw_html").contains("raw source"));
+        }
     }
 }

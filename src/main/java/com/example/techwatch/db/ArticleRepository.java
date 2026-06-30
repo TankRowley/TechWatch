@@ -62,6 +62,24 @@ public class ArticleRepository {
         }
     }
 
+    public void setSavedByUser(long articleId, boolean saved) throws SQLException {
+        updateFlag(articleId, "saved_by_user", saved);
+    }
+
+    public void setCleanupProtected(long articleId, boolean protectedFromCleanup) throws SQLException {
+        updateFlag(articleId, "cleanup_protected", protectedFromCleanup);
+    }
+
+    private void updateFlag(long articleId, String column, boolean value) throws SQLException {
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(
+                "UPDATE articles SET " + column + "=?,updated_at=? WHERE id=?")) {
+            statement.setInt(1, value ? 1 : 0);
+            statement.setString(2, Instant.now().toString());
+            statement.setLong(3, articleId);
+            statement.executeUpdate();
+        }
+    }
+
     public Optional<Article> findByUrl(String url) throws SQLException {
         return findOne(SELECT_COLUMNS + " WHERE a.url=?", url);
     }
@@ -106,7 +124,9 @@ public class ArticleRepository {
         return new Article(result.getLong("id"), nullableLong(result, "source_id"), result.getString("source_name"),
                 result.getString("title"), result.getString("url"), DbTime.instant(result.getString("published_at")),
                 DbTime.instant(result.getString("fetched_at")), result.getString("summary_original"),
-                result.getString("body_status"), result.getDouble("article_score"), result.getString("importance_label"));
+                result.getString("body_status"), result.getDouble("article_score"), result.getString("importance_label"),
+                result.getInt("archived") != 0, result.getInt("saved_by_user") != 0,
+                result.getInt("cleanup_protected") != 0);
     }
 
     private Long nullableLong(ResultSet result, String column) throws SQLException {

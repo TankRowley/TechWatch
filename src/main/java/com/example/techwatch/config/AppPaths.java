@@ -42,6 +42,7 @@ public final class AppPaths {
     public Path sourceConfig() throws IOException { return ensureConfig("sources.yml"); }
     public Path keywordConfig() throws IOException { return ensureConfig("keywords.yml"); }
     public Path jobMarketCsv() throws IOException { return ensureConfig("job-market.csv"); }
+    public Path retentionConfig() throws IOException { return ensureConfig("retention.yml"); }
 
     public void ensureDirectories() throws IOException {
         Files.createDirectories(home);

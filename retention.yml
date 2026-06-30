@@ -1,0 +1,11 @@
+retention:
+  articleBodyDays: 60
+  rawHtmlDays: 30
+  executionLogDays: 30
+  unselectedArticleDays: 180
+  articleMetadataDays: 365
+  jobSnapshotDays: 365
+  htmlReportDays: 365
+  keepMarkdownReports: true
+  keepWeeklyKeywordStats: true
+  keepKeywordMarketStats: true

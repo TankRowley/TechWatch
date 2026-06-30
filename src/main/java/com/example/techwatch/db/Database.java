@@ -49,9 +49,27 @@ public class Database {
                         body_status TEXT NOT NULL DEFAULT 'SKIPPED',
                         article_score REAL NOT NULL DEFAULT 0,
                         importance_label TEXT NOT NULL DEFAULT 'UNRATED',
+                        archived INTEGER NOT NULL DEFAULT 0,
+                        saved_by_user INTEGER NOT NULL DEFAULT 0,
+                        cleanup_protected INTEGER NOT NULL DEFAULT 0,
                         created_at TEXT NOT NULL,
                         updated_at TEXT NOT NULL,
                         FOREIGN KEY (source_id) REFERENCES sources(id)
+                    )
+                    """);
+            ensureColumn(connection, "articles", "archived", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "articles", "saved_by_user", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "articles", "cleanup_protected", "INTEGER NOT NULL DEFAULT 0");
+            statement.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS article_bodies (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        article_id INTEGER NOT NULL UNIQUE,
+                        body_text TEXT,
+                        raw_html TEXT,
+                        fetched_at TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
                     )
                     """);
             statement.executeUpdate("""
@@ -159,6 +177,7 @@ public class Database {
                     """);
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_articles_score ON articles(article_score DESC)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_articles_published ON articles(published_at)");
+            statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_article_bodies_fetched ON article_bodies(fetched_at)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_mentions_observed ON keyword_mentions(observed_at)");
             statement.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS keyword_weekly_stats (
@@ -248,6 +267,7 @@ public class Database {
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_keyword_weekly_stats ON keyword_weekly_stats(keyword_id,week_start)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_keyword_market_stats ON keyword_market_stats(keyword_id,week_start)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_discovered_last_seen ON discovered_keywords(last_seen_at DESC)");
+            statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_job_snapshots_fetched ON job_market_snapshots(fetched_at)");
         }
     }
 

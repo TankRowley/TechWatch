@@ -30,6 +30,7 @@ public class TechWatchGuiApp extends Application {
     private final KeywordTableController keywords = new KeywordTableController();
     private final ExploreController explore = new ExploreController();
     private final JobMarketController jobMarket = new JobMarketController();
+    private final RetentionSettingsController retention = new RetentionSettingsController();
     private final TextArea report = textArea();
     private final TextArea logs = textArea();
     private final TabPane tabs = new TabPane();
@@ -149,9 +150,10 @@ public class TechWatchGuiApp extends Application {
         locations.setText("データ保存先\n" + paths.home() + "\n\n情報源設定\nconfig/sources.yml または sources.yml"
                 + "\n\nキーワード候補\nconfig/keywords.yml または keywords.yml\n\n日本語AI要約"
                 + "\n\n求人市場CSV\nconfig/job-market.csv"
+                + "\n\nデータ保持設定\nconfig/retention.yml"
                 + "\nOPENAI_API_KEY（OpenAI利用時）\nOPENAI_MODEL（LM StudioではロードしたモデルID）"
                 + "\nOPENAI_BASE_URL（LM Studio例: http://localhost:1234/v1）");
-        VBox box = new VBox(14, heading, note, setup, locations);
+        VBox box = new VBox(14, heading, note, setup, retention.view(), locations);
         box.setPadding(new Insets(24));
         VBox.setVgrow(locations, Priority.ALWAYS);
         return box;
