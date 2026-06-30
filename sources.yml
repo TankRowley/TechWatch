@@ -1,0 +1,13 @@
+sources:
+  - name: Cloudflare Blog
+    type: rss
+    url: https://blog.cloudflare.com/rss/
+    trustScore: 5
+  - name: Netflix TechBlog
+    type: rss
+    url: https://netflixtechblog.com/feed
+    trustScore: 4
+  - name: Databricks Blog
+    type: rss
+    url: https://www.databricks.com/feed
+    trustScore: 5

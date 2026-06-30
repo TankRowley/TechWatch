@@ -1,0 +1,18 @@
+keywords:
+  - { name: Java, category: Java, status: Core, weight: 5 }
+  - { name: JVM, category: Java, status: Core, weight: 5 }
+  - { name: Spring Boot, category: Backend, status: Core, weight: 4 }
+  - { name: HTTP, category: Backend, status: Core, weight: 5 }
+  - { name: SQL, category: Data Engineering, status: Core, weight: 5 }
+  - { name: Linux, category: Infrastructure, status: Core, weight: 5 }
+  - { name: Git, category: DevOps, status: Core, weight: 4 }
+  - { name: Docker, category: Infrastructure, status: Core, weight: 5 }
+  - { name: Kubernetes, category: Cloud, status: Watch, weight: 4 }
+  - { name: Databricks, category: Data Engineering, status: Watch, weight: 5 }
+  - { name: Kafka, category: Data Engineering, status: Watch, weight: 4 }
+  - { name: LLM, category: AI, status: Watch, weight: 4 }
+  - { name: AI Agent, category: AI, status: Buzz, weight: 4 }
+  - { name: MCP, category: AI, status: Watch, weight: 4 }
+  - { name: RAG, category: AI, status: Watch, weight: 4 }
+  - { name: Vector Database, category: AI, status: Watch, weight: 3 }
+  - { name: PostgreSQL, category: Data Engineering, status: Core, weight: 4 }

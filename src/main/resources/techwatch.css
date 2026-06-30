@@ -1,0 +1,61 @@
+.root {
+    -fx-font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
+    -fx-font-size: 13px;
+    -fx-background-color: #f4f7fb;
+    -fx-text-fill: #17233c;
+}
+
+.top-bar {
+    -fx-background-color: linear-gradient(to right, #12213d, #173e61);
+    -fx-border-color: transparent transparent #43c9b8 transparent;
+    -fx-border-width: 0 0 3 0;
+}
+
+.brand { -fx-font-size: 25px; -fx-font-weight: 800; -fx-text-fill: white; }
+.subtitle { -fx-font-size: 11px; -fx-text-fill: #b9cbe1; }
+.status { -fx-text-fill: #c6d4e5; }
+.section-title { -fx-font-size: 21px; -fx-font-weight: 700; -fx-text-fill: #17233c; }
+.subsection-title { -fx-font-size: 15px; -fx-font-weight: 700; }
+.conclusion {
+    -fx-font-size: 15px;
+    -fx-line-spacing: 5px;
+    -fx-padding: 16px;
+    -fx-background-color: #e8f7f4;
+    -fx-background-radius: 10px;
+    -fx-border-color: #b9e6df;
+    -fx-border-radius: 10px;
+}
+
+.metric-card {
+    -fx-padding: 15px 18px;
+    -fx-background-color: white;
+    -fx-background-radius: 10px;
+    -fx-border-color: #dae2ee;
+    -fx-border-radius: 10px;
+}
+
+.metric-value { -fx-font-size: 26px; -fx-font-weight: 800; -fx-text-fill: #167a76; }
+.metric-label { -fx-text-fill: #65748b; }
+.button {
+    -fx-background-color: #e7edf5;
+    -fx-text-fill: #17314e;
+    -fx-font-weight: 600;
+    -fx-padding: 9px 15px;
+    -fx-background-radius: 7px;
+    -fx-cursor: hand;
+}
+.button:hover { -fx-background-color: #d7e2ef; }
+.primary-button { -fx-background-color: #43c9b8; -fx-text-fill: #0c2b31; }
+.primary-button:hover { -fx-background-color: #63ddcc; }
+.tab-pane .tab-header-area .tab-header-background { -fx-background-color: #e8edf4; }
+.tab { -fx-background-color: transparent; -fx-padding: 8px 16px; }
+.tab:selected { -fx-background-color: white; }
+.tab:selected .tab-label { -fx-text-fill: #126c69; -fx-font-weight: 700; }
+.table-view, .list-view, .text-area {
+    -fx-background-color: white;
+    -fx-border-color: #d6dfeb;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+.table-view .column-header-background { -fx-background-color: #edf2f7; }
+.table-row-cell:selected { -fx-background-color: #cdeee9; -fx-text-background-color: #17233c; }

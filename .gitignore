@@ -1,0 +1,11 @@
+target/
+dist/
+package-input/
+techwatch.db
+techwatch.db-*
+logs/*.log
+reports/weekly/*.md
+!reports/weekly/.gitkeep
+.idea/
+.vscode/
+*.iml
