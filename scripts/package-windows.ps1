@@ -20,7 +20,12 @@ function Remove-WorkspaceDirectory([string]$Path) {
 
 Push-Location $root
 try {
-    mvn clean package
+    $mavenWrapper = Join-Path $root 'mvnw.cmd'
+    if (Test-Path -LiteralPath $mavenWrapper) {
+        & $mavenWrapper clean package
+    } else {
+        mvn clean package
+    }
     if ($LASTEXITCODE -ne 0) { throw 'Maven build failed.' }
 
     Remove-WorkspaceDirectory $inputDir
