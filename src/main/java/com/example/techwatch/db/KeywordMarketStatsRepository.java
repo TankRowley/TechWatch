@@ -21,13 +21,14 @@ public class KeywordMarketStatsRepository {
         try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO keyword_market_stats(keyword_id,week_start,us_job_count,jp_job_count,us_growth_4w,
                   jp_growth_4w,us_growth_12w,jp_growth_12w,us_market_score,jp_market_score,
-                  global_market_score,market_label,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                  global_market_score,market_label,observation_status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(keyword_id,week_start) DO UPDATE SET us_job_count=excluded.us_job_count,
                   jp_job_count=excluded.jp_job_count,us_growth_4w=excluded.us_growth_4w,
                   jp_growth_4w=excluded.jp_growth_4w,us_growth_12w=excluded.us_growth_12w,
                   jp_growth_12w=excluded.jp_growth_12w,us_market_score=excluded.us_market_score,
                   jp_market_score=excluded.jp_market_score,global_market_score=excluded.global_market_score,
-                  market_label=excluded.market_label,updated_at=excluded.updated_at
+                  market_label=excluded.market_label,observation_status=excluded.observation_status,
+                  updated_at=excluded.updated_at
                 """)) {
             int i = 1;
             statement.setLong(i++, value.keywordId()); statement.setString(i++, value.weekStart().toString());
@@ -36,6 +37,7 @@ public class KeywordMarketStatsRepository {
             statement.setDouble(i++, value.usGrowth12w()); statement.setDouble(i++, value.jpGrowth12w());
             statement.setDouble(i++, value.usMarketScore()); statement.setDouble(i++, value.jpMarketScore());
             statement.setDouble(i++, value.globalMarketScore()); statement.setString(i++, value.marketLabel());
+            statement.setString(i++, value.observationStatus());
             statement.setString(i++, now); statement.setString(i, now); statement.executeUpdate();
         }
     }
@@ -64,12 +66,26 @@ public class KeywordMarketStatsRepository {
         return values;
     }
 
+    public List<KeywordMarketStats> findBefore(long keywordId, LocalDate week, int limit) throws SQLException {
+        List<KeywordMarketStats> values = new ArrayList<>();
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement("""
+                SELECT * FROM (SELECT * FROM keyword_market_stats
+                  WHERE keyword_id=? AND week_start<? AND observation_status<>'MISSING'
+                  ORDER BY week_start DESC LIMIT ?) ORDER BY week_start
+                """)) {
+            statement.setLong(1, keywordId); statement.setString(2, week.toString()); statement.setInt(3, limit);
+            try (ResultSet result = statement.executeQuery()) { while (result.next()) values.add(map(result)); }
+        }
+        return values;
+    }
+
     private KeywordMarketStats map(ResultSet result) throws SQLException {
         return new KeywordMarketStats(result.getLong("keyword_id"), LocalDate.parse(result.getString("week_start")),
                 result.getInt("us_job_count"), result.getInt("jp_job_count"),
                 result.getDouble("us_growth_4w"), result.getDouble("jp_growth_4w"),
                 result.getDouble("us_growth_12w"), result.getDouble("jp_growth_12w"),
                 result.getDouble("us_market_score"), result.getDouble("jp_market_score"),
-                result.getDouble("global_market_score"), result.getString("market_label"));
+                result.getDouble("global_market_score"), result.getString("market_label"),
+                result.getString("observation_status"));
     }
 }

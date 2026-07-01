@@ -29,6 +29,7 @@ try {
     New-Item -ItemType Directory -Path $distDir -Force | Out-Null
     if (-not $Installer) { New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null }
     Copy-Item -LiteralPath (Join-Path $root 'target\techwatch-gui.jar') -Destination $inputDir
+    Copy-Item -LiteralPath (Join-Path $root 'target\techwatch.jar') -Destination $inputDir
 
     $jpackage = Get-Command jpackage.exe -ErrorAction SilentlyContinue
     if (-not $jpackage -and $env:JAVA_HOME) {
@@ -48,11 +49,12 @@ try {
         '--input', $inputDir,
         '--dest', $(if ($Installer) { $distDir } else { $stagingDir }),
         '--name', $productName,
-        '--app-version', '1.3.1',
+        '--app-version', '1.4.0',
         '--vendor', $productName,
         '--description', '技術情報を収集・評価し、週報として届けるアプリ',
         '--main-jar', 'techwatch-gui.jar',
         '--main-class', 'com.example.techwatch.gui.GuiLauncher',
+        '--add-launcher', ('techwatch-cli=' + (Join-Path $root 'scripts\techwatch-cli.properties')),
         '--java-options', '--enable-native-access=ALL-UNNAMED',
         '--java-options', '-Dtechwatch.packaged=true'
     )
@@ -86,6 +88,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $root 'job-market.csv') -Destination (Join-Path $appHome 'config\job-market.csv')
         Copy-Item -LiteralPath (Join-Path $root 'retention.yml') -Destination (Join-Path $appHome 'config\retention.yml')
         Copy-Item -LiteralPath (Join-Path $root 'src\main\resources\defaults\email.yml') -Destination (Join-Path $appHome 'config\email.yml')
+        Copy-Item -LiteralPath (Join-Path $root 'scripts\register-weekly-task.ps1') -Destination $appHome
         Remove-WorkspaceDirectory $legacyAppHome
         Remove-WorkspaceDirectory $stagingDir
         Write-Host "Created: $(Join-Path $appHome ($productName + '.exe'))"

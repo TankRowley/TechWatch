@@ -15,7 +15,8 @@ public class KeywordPriorityService {
     public List<Keyword> evaluate(List<Keyword> values, Map<Long, KeywordMarketStats> marketStats) throws Exception {
         for (Keyword keyword : values) {
             KeywordMarketStats market = marketStats == null ? null : marketStats.get(keyword.getId());
-            boolean hasMarket = market != null && (market.usJobCount() > 0 || market.jpJobCount() > 0);
+            boolean hasMarket = market != null && market.isObserved()
+                    && (market.usJobCount() > 0 || market.jpJobCount() > 0);
             double evidence = hasMarket
                     ? keyword.getActivityScore() * 0.50 + keyword.getStabilityScore() * 0.20
                         + market.globalMarketScore() * 0.30

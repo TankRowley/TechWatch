@@ -1,13 +1,21 @@
 sources:
-  - name: Cloudflare Blog
-    type: rss
-    url: https://blog.cloudflare.com/rss/
-    trustScore: 5
-  - name: Netflix TechBlog
-    type: rss
-    url: https://netflixtechblog.com/feed
-    trustScore: 4
-  - name: Databricks Blog
-    type: rss
-    url: https://www.databricks.com/feed
-    trustScore: 5
+  - { name: Cloudflare Blog, type: rss, url: "https://blog.cloudflare.com/rss/", trustScore: 5, category: VENDOR }
+  - { name: Netflix TechBlog, type: rss, url: "https://netflixtechblog.com/feed", trustScore: 4, category: VENDOR }
+  - { name: Databricks Blog, type: rss, url: "https://www.databricks.com/feed", trustScore: 5, category: VENDOR }
+  - { name: GitHub Engineering, type: rss, url: "https://github.blog/engineering/feed/", trustScore: 5, category: VENDOR }
+  - { name: Docker Blog, type: rss, url: "https://www.docker.com/blog/feed/", trustScore: 4, category: VENDOR }
+  - { name: Kubernetes Blog, type: rss, url: "https://kubernetes.io/feed.xml", trustScore: 5, category: OSS }
+  - { name: Spring Blog, type: rss, url: "https://spring.io/blog.atom", trustScore: 5, category: OSS }
+  - { name: PostgreSQL News, type: rss, url: "https://www.postgresql.org/news.rss", trustScore: 5, category: OSS }
+  - { name: Mozilla Hacks, type: rss, url: "https://hacks.mozilla.org/feed/", trustScore: 4, category: OSS }
+  - { name: Martin Fowler, type: rss, url: "https://martinfowler.com/feed.atom", trustScore: 5, category: INDEPENDENT }
+  - { name: InfoQ, type: rss, url: "https://feed.infoq.com/", trustScore: 4, category: INDEPENDENT }
+  - { name: Quarkus Blog, type: rss, url: "https://quarkus.io/feed.xml", trustScore: 5, category: OSS }
+  - { name: Kotlin Blog, type: rss, url: "https://blog.jetbrains.com/kotlin/feed/", trustScore: 4, category: VENDOR }
+  - { name: Inside Java, type: rss, url: "https://inside.java/feed.xml", trustScore: 5, category: VENDOR }
+  - { name: CNCF Blog, type: rss, url: "https://www.cncf.io/feed/", trustScore: 4, category: OSS }
+  - { name: Meta Engineering, type: rss, url: "https://engineering.fb.com/feed/", trustScore: 4, category: VENDOR }
+  - { name: Stack Overflow Blog, type: rss, url: "https://stackoverflow.blog/feed/", trustScore: 4, category: COMMUNITY }
+  - { name: Apache Camel Blog, type: rss, url: "https://camel.apache.org/blog/index.xml", trustScore: 5, category: OSS }
+  - { name: arXiv Software Engineering, type: rss, url: "https://export.arxiv.org/rss/cs.SE", trustScore: 4, category: RESEARCH }
+  - { name: arXiv Artificial Intelligence, type: rss, url: "https://export.arxiv.org/rss/cs.AI", trustScore: 4, category: RESEARCH }

@@ -23,6 +23,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import java.awt.Desktop;
+import java.nio.file.Path;
 
 public class TechWatchGuiApp extends Application {
     private final WeeklyRunService service = new WeeklyRunService();
@@ -152,6 +154,13 @@ public class TechWatchGuiApp extends Application {
         setup.setOnAction(event -> {
             if (new FirstRunSetupDialog().show(stage, false)) loadExisting();
         });
+        Button sources = new Button("情報源設定を開く");
+        sources.setOnAction(event -> openConfig(() -> paths.sourceConfig()));
+        Button keywordConfig = new Button("キーワード設定を開く");
+        keywordConfig.setOnAction(event -> openConfig(() -> paths.keywordConfig()));
+        Button jobs = new Button("求人CSVを開く");
+        jobs.setOnAction(event -> openConfig(() -> paths.jobMarketCsv()));
+        HBox configButtons = new HBox(10, sources, keywordConfig, jobs);
         TextArea locations = textArea();
         locations.setText("データ保存先\n" + paths.home() + "\n\n情報源設定\nconfig/sources.yml または sources.yml"
                 + "\n\nキーワード候補\nconfig/keywords.yml または keywords.yml\n\n日本語AI要約"
@@ -160,7 +169,7 @@ public class TechWatchGuiApp extends Application {
                 + "\n\nGmail送信先\nconfig/email.yml"
                 + "\nOPENAI_API_KEY（OpenAI利用時）\nOPENAI_MODEL（LM StudioではロードしたモデルID）"
                 + "\nOPENAI_BASE_URL（LM Studio例: http://localhost:1234/v1）");
-        VBox box = new VBox(14, heading, note, setup, mailSettings.view(), retention.view(), locations);
+        VBox box = new VBox(14, heading, note, setup, configButtons, mailSettings.view(), retention.view(), locations);
         box.setPadding(new Insets(24));
         VBox.setVgrow(locations, Priority.ALWAYS);
         ScrollPane scroll = new ScrollPane(box);
@@ -189,5 +198,15 @@ public class TechWatchGuiApp extends Application {
     private Tab tab(String title, javafx.scene.Node content) { return new Tab(title, content); }
     private static TextArea textArea() { TextArea area = new TextArea(); area.setEditable(false); area.setWrapText(true); return area; }
     private void start(Task<?> task) { Thread.ofVirtual().name("techwatch-worker").start(task); }
+    private void openConfig(PathSupplier supplier) {
+        try {
+            Path path=supplier.get();
+            if(!Desktop.isDesktopSupported()) throw new IllegalStateException("デスクトップ操作を利用できません");
+            Desktop.getDesktop().open(path.toFile());
+        } catch(Exception error) {
+            status.setText("設定ファイルを開けません"); logs.appendText("\nERROR: "+message(error));
+        }
+    }
+    @FunctionalInterface private interface PathSupplier { Path get() throws Exception; }
     private String message(Throwable error) { return error == null ? "不明なエラー" : error.getClass().getSimpleName() + ": " + error.getMessage(); }
 }

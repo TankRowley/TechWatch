@@ -43,6 +43,10 @@ class KeywordTrendEvaluatorTest {
 
         assertEquals("Insufficient", evaluator.evaluate(values));
     }
+    @Test void historicalPartialHasReducedCoverage(){
+        var v=new KeywordWeeklyStats(1,LocalDate.of(2026,1,5),3,1,1,1,0,8,20,1,4,"HISTORICAL_PARTIAL",1);
+        assertEquals(0.25,v.collectionCoverage());
+    }
 
     private List<KeywordWeeklyStats> history(int... mentions) {
         List<KeywordWeeklyStats> values = new ArrayList<>();

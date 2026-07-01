@@ -17,10 +17,11 @@ public class SourceRepository {
     public Source save(Source source) throws SQLException {
         String now = Instant.now().toString();
         String sql = """
-                INSERT INTO sources(name,url,type,trust_score,status,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?)
+                INSERT INTO sources(name,url,type,trust_score,status,source_category,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,?)
                 ON CONFLICT(url) DO UPDATE SET name=excluded.name,type=excluded.type,
-                  trust_score=excluded.trust_score,status=excluded.status,updated_at=excluded.updated_at
+                  trust_score=excluded.trust_score,status=excluded.status,
+                  source_category=excluded.source_category,updated_at=excluded.updated_at
                 """;
         try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, source.name());
@@ -28,8 +29,9 @@ public class SourceRepository {
             statement.setString(3, source.type());
             statement.setInt(4, source.trustScore());
             statement.setString(5, source.status());
-            statement.setString(6, now);
+            statement.setString(6, source.category());
             statement.setString(7, now);
+            statement.setString(8, now);
             statement.executeUpdate();
         }
         return findByUrl(source.url());
@@ -58,6 +60,7 @@ public class SourceRepository {
 
     private Source map(ResultSet result) throws SQLException {
         return new Source(result.getLong("id"), result.getString("name"), result.getString("url"),
-                result.getString("type"), result.getInt("trust_score"), result.getString("status"));
+                result.getString("type"), result.getInt("trust_score"), result.getString("status"),
+                result.getString("source_category"));
     }
 }

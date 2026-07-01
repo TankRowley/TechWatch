@@ -18,4 +18,9 @@ class KeywordMarketEvaluatorTest {
         assertEquals("US Leading", result.marketLabel());
         assertTrue(result.globalMarketScore() > 0);
     }
+    @Test void firstObservationHasNoFakeGrowth(){
+        Keyword k=new Keyword(1L,"New Tool","new tool","Other","Watch",3,0,0,0,0,0,0,null,null);
+        var r=new KeywordMarketEvaluator().evaluate(k,LocalDate.of(2026,6,29),100,20,List.of());
+        assertEquals(0,r.usGrowth4w()); assertEquals("OBSERVED",r.observationStatus());
+    }
 }

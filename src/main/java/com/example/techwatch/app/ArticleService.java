@@ -18,12 +18,15 @@ import com.example.techwatch.score.ArticleScorer;
 import com.example.techwatch.source.Source;
 import com.example.techwatch.summarize.ArticleSummarizer;
 import com.example.techwatch.summarize.ArticleSummary;
+import com.example.techwatch.summarize.NoopArticleSummarizer;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.concurrent.Future;
 
 public class ArticleService {
     private final ArticleRepository articleRepository;
@@ -56,8 +59,17 @@ public class ArticleService {
 
     public ArticleRunStats collect(List<Source> sources, List<Keyword> keywords, Consumer<String> log) {
         int fetched = 0, saved = 0, duplicates = 0, scored = 0, mentions = 0, failedArticles = 0, failedSources = 0;
-        for (Source source : sources) {
-            FeedFetchResult fetchResult = feedFetcher.fetch(source);
+        Map<Source, Future<FeedFetchResult>> fetches = new LinkedHashMap<>();
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            for (Source source : sources) fetches.put(source, executor.submit(() -> feedFetcher.fetch(source)));
+            for (Source source : sources) {
+            FeedFetchResult fetchResult;
+            try { fetchResult = fetches.get(source).get(); }
+            catch (Exception error) {
+                failedSources++;
+                log.accept("情報源の取得に失敗: " + source.name() + "（" + error.getMessage() + "）");
+                continue;
+            }
             if (!fetchResult.successful()) {
                 failedSources++;
                 log.accept("情報源の取得に失敗: " + source.name() + "（" + fetchResult.errorMessage() + "）");
@@ -79,18 +91,20 @@ public class ArticleService {
                         persisted = inserted.get();
                     }
                     articleRepository.markProcessing(persisted.getId());
-                    List<KeywordMatch> matches = keywordExtractor.extract(persisted, keywords);
-                    ArticleScore score = articleScorer.score(persisted, source, matches);
-                    persisted.setArticleScore(score.score());
-                    persisted.setImportanceLabel(score.label());
-
-                    BodyExtractionResult body = shouldFetchBody(score) ? bodyExtractor.extract(persisted.getUrl())
+                    List<KeywordMatch> preliminaryMatches = keywordExtractor.extract(persisted, keywords);
+                    boolean enrich = isRecentForEnrichment(persisted);
+                    BodyExtractionResult body = enrich && shouldFetchBody(preliminaryMatches)
+                            ? bodyExtractor.extract(persisted.getUrl())
                             : BodyExtractionResult.skipped();
+                    List<KeywordMatch> matches = keywordExtractor.extract(persisted, body.bodyText(), keywords);
+                    ArticleScore score = articleScorer.score(persisted, source, matches);
+                    persisted.setArticleScore(score.score()); persisted.setImportanceLabel(score.label());
                     persisted.setBodyStatus(body.status().name());
                     articleRepository.updateAnalysis(persisted.getId(), score.score(), score.label(), body.status().name());
                     bodyRepository.save(persisted.getId(), body.bodyText(), body.rawHtml(), persisted.getFetchedAt());
-                    ArticleSummary summary = summarizer.summarize(persisted,
-                            body.bodyText().isBlank() ? persisted.getSummaryOriginal() : body.bodyText());
+                    ArticleSummary summary = (enrich && score.score() >= 5 ? summarizer : new NoopArticleSummarizer())
+                            .summarize(persisted, body.bodyText().isBlank()
+                                    ? persisted.getSummaryOriginal() : body.bodyText());
                     summaryRepository.save(persisted.getId(), summary);
                     scored++;
 
@@ -114,13 +128,19 @@ public class ArticleService {
                     log.accept("記事の処理に失敗: " + article.getTitle() + "（" + error.getMessage() + "）");
                 }
             }
+            }
         }
         return new ArticleRunStats(fetched, saved, duplicates, scored, mentions, failedArticles, failedSources);
     }
 
-    private boolean shouldFetchBody(ArticleScore score) {
+    private boolean shouldFetchBody(List<KeywordMatch> matches) {
         String skip = System.getenv("TECHWATCH_SKIP_BODY");
-        return !"true".equalsIgnoreCase(skip) && score.score() >= 5;
+        return !"true".equalsIgnoreCase(skip) && !matches.isEmpty();
+    }
+
+    private boolean isRecentForEnrichment(Article article) {
+        Instant reference = article.getPublishedAt() == null ? article.getFetchedAt() : article.getPublishedAt();
+        return reference != null && !reference.isBefore(Instant.now().minus(java.time.Duration.ofDays(14)));
     }
 
     public int rescore(List<Article> articles, List<Keyword> keywords, Map<Long, Source> sources,
@@ -130,7 +150,9 @@ public class ArticleService {
             try {
                 Source source = sources.get(article.getSourceId());
                 if (source == null) continue;
-                ArticleScore score = articleScorer.score(article, source, keywordExtractor.extract(article, keywords));
+                String body = article.getId() == null ? "" : bodyRepository.findBodyText(article.getId()).orElse("");
+                ArticleScore score = articleScorer.score(article, source,
+                        keywordExtractor.extract(article, body, keywords));
                 articleRepository.updateAnalysis(article.getId(), score.score(), score.label(), article.getBodyStatus());
                 article.setArticleScore(score.score());
                 article.setImportanceLabel(score.label());

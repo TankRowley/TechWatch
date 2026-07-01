@@ -17,7 +17,7 @@ public class KeywordMarketEvaluator {
         double global = Math.min(100, usScore * 0.55 + jpScore * 0.45 + (usCount > 0 && jpCount > 0 ? 8 : 0));
         String label = label(keyword, usCount, jpCount, us4, jp4);
         return new KeywordMarketStats(keyword.getId(), weekStart, usCount, jpCount, us4, jp4, us12, jp12,
-                usScore, jpScore, global, label);
+                usScore, jpScore, global, label, "OBSERVED");
     }
 
     private String label(Keyword keyword, int us, int jp, double usGrowth, double jpGrowth) {
@@ -34,7 +34,7 @@ public class KeywordMarketEvaluator {
     private double countScore(int count) { return Math.min(75, Math.log10(count + 1) * 22); }
     private double growthScore(double growth) { return Math.max(-15, Math.min(25, growth * 25)); }
     private double growth(int current, double previous) {
-        if (previous <= 0) return current > 0 ? 1 : 0;
+        if (previous <= 0) return 0;
         return (current - previous) / previous;
     }
     private double tailAverage(List<KeywordMarketStats> history, int count, boolean us) {

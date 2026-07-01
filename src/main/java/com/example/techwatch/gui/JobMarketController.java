@@ -35,6 +35,7 @@ public class JobMarketController {
         table.getColumns().add(column("最近の動き", 95, row -> labels.trendState(row.keyword().getTrendState())));
         table.getColumns().add(column("米国求人数", 90, row -> Integer.toString(row.market().usJobCount())));
         table.getColumns().add(column("日本求人数", 90, row -> Integer.toString(row.market().jpJobCount())));
+        table.getColumns().add(column("データ鮮度", 90, row -> freshness(row.market())));
         table.getColumns().add(column("市場評価", 110, row -> labels.marketLabel(row.market().marketLabel())));
         table.getColumns().add(column("学習リターン", 100, row -> String.format("%.1f", row.learningRoi())));
         table.getColumns().add(column("判断", 260, this::reason));
@@ -58,9 +59,16 @@ public class JobMarketController {
         if (row != null) new KeywordDetailDialog().show(table.getScene().getWindow(), row.keyword(), row.market());
     }
     private double roi(Keyword keyword, KeywordMarketStats market) {
-        return Math.min(100, market.globalMarketScore() + (keyword.isLearning() ? 10 : 0)
+        double marketScore = market.isObserved() ? market.globalMarketScore() : 0;
+        return Math.min(100, marketScore + (keyword.isLearning() ? 10 : 0)
                 + (keyword.isPinned() ? 6 : 0) + ("Core".equals(keyword.getStatus()) ? 8 : 0)
                 - keyword.getBuzzRiskScore());
+    }
+    private String freshness(KeywordMarketStats market) {
+        return switch (market.observationStatus().toUpperCase(java.util.Locale.ROOT)) {
+            case "OBSERVED" -> "観測済み"; case "STALE" -> "更新待ち";
+            case "MISSING" -> "欠測"; default -> "旧形式";
+        };
     }
     private String reason(Row row) {
         return switch (row.market().marketLabel()) {

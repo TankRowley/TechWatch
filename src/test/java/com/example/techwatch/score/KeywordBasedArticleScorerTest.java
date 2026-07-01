@@ -53,4 +53,9 @@ class KeywordBasedArticleScorerTest {
         assertEquals(base.score() + 5, personalized.score());
         assertEquals("Watch", personalized.label());
     }
+    @Test void trustAloneCannotPromoteIrrelevantArticle(){
+        Article a=Article.fetched(1L,"Vendor","Company update","https://e/d",Instant.now(),"Business news");
+        var score=new KeywordBasedArticleScorer().score(a,new Source(1L,"Vendor","https://e","rss",5,"ACTIVE"),List.of());
+        assertEquals(4.9,score.score()); assertEquals("Archive",score.label());
+    }
 }

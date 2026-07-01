@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class RssFeedFetcher implements FeedFetcher {
+    private static final int MAX_ARTICLES_PER_SOURCE = 250;
+    private static final Duration MAX_HISTORY = Duration.ofDays(53L * 7);
     private final SafeHttpClient httpClient;
 
     public RssFeedFetcher() {
@@ -57,8 +59,10 @@ public class RssFeedFetcher implements FeedFetcher {
             if (url == null || url.isBlank()) continue;
             Instant published = entry.getPublishedDate() != null ? entry.getPublishedDate().toInstant()
                     : entry.getUpdatedDate() != null ? entry.getUpdatedDate().toInstant() : null;
+            if (published != null && published.isBefore(Instant.now().minus(MAX_HISTORY))) continue;
             String summary = entry.getDescription() == null ? "" : entry.getDescription().getValue();
             articles.add(Article.fetched(source.id(), source.name(), entry.getTitle(), url, published, summary));
+            if (articles.size() >= MAX_ARTICLES_PER_SOURCE) break;
         }
         return articles;
     }

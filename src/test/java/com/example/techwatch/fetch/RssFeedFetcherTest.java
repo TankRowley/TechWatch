@@ -15,7 +15,7 @@ class RssFeedFetcherTest {
                 <?xml version="1.0" encoding="UTF-8"?>
                 <rss version="2.0"><channel><title>Test</title>
                   <item><title>Java and Docker</title><link>https://example.com/a</link>
-                  <description>Technical article</description><pubDate>Mon, 30 Jun 2025 10:00:00 GMT</pubDate></item>
+                  <description>Technical article</description></item>
                 </channel></rss>
                 """;
         Source source = new Source(1L, "Test", "https://example.com/feed", "rss", 5, "ACTIVE");

@@ -33,10 +33,12 @@ public class Database {
                         type TEXT NOT NULL,
                         trust_score INTEGER NOT NULL DEFAULT 1,
                         status TEXT NOT NULL DEFAULT 'ACTIVE',
+                        source_category TEXT NOT NULL DEFAULT 'OTHER',
                         created_at TEXT NOT NULL,
                         updated_at TEXT NOT NULL
                     )
                     """);
+            ensureColumn(connection, "sources", "source_category", "TEXT NOT NULL DEFAULT 'OTHER'");
             statement.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS articles (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,6 +101,7 @@ public class Database {
                         category TEXT,
                         status TEXT NOT NULL DEFAULT 'Candidate',
                         weight INTEGER NOT NULL DEFAULT 1,
+                        aliases TEXT NOT NULL DEFAULT '',
                         trend_score REAL NOT NULL DEFAULT 0,
                         stability_score REAL NOT NULL DEFAULT 0,
                         market_score REAL NOT NULL DEFAULT 0,
@@ -118,6 +121,7 @@ public class Database {
                         updated_at TEXT NOT NULL
                     )
                     """);
+            ensureColumn(connection, "keywords", "aliases", "TEXT NOT NULL DEFAULT ''");
             ensureColumn(connection, "keywords", "pinned", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "keywords", "pinned_at", "TEXT");
             ensureColumn(connection, "keywords", "pin_reason", "TEXT");
@@ -208,6 +212,7 @@ public class Database {
             ensureColumn(connection, "keyword_weekly_stats", "configured_source_count", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "keyword_weekly_stats", "collection_status", "TEXT NOT NULL DEFAULT 'LEGACY'");
             ensureColumn(connection, "keyword_weekly_stats", "source_concentration", "REAL NOT NULL DEFAULT 1");
+            ensureColumn(connection, "keyword_weekly_stats", "category_concentration", "REAL NOT NULL DEFAULT 1");
             statement.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS discovered_keywords (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -278,6 +283,7 @@ public class Database {
                     """);
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_keyword_weekly_stats ON keyword_weekly_stats(keyword_id,week_start)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_keyword_market_stats ON keyword_market_stats(keyword_id,week_start)");
+            ensureColumn(connection, "keyword_market_stats", "observation_status", "TEXT NOT NULL DEFAULT 'LEGACY'");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_discovered_last_seen ON discovered_keywords(last_seen_at DESC)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_job_snapshots_fetched ON job_market_snapshots(fetched_at)");
             statement.executeUpdate("""

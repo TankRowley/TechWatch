@@ -13,6 +13,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -28,7 +30,7 @@ class WeeklyRunServiceTest {
         Files.writeString(temp.resolve("keywords.yml"), "keywords:\n  - { name: Java, category: Java, status: Core, weight: 5 }\n");
         var fetcher = (com.example.techwatch.fetch.FeedFetcher) source -> FeedFetchResult.success(java.util.List.of(
                 Article.fetched(source.id(), source.name(), "Java architecture", "https://example.com/article",
-                        Instant.now(), "A practical Java implementation")));
+                        previousCompletedWeekInstant(), "A practical Java implementation")));
         WeeklyRunService service = new WeeklyRunService(new AppPaths(temp), fetcher,
                 url -> new BodyExtractionResult(BodyStatus.SUCCESS, "A sufficiently detailed Java article body",
                         "<html><body>raw source</body></html>", ""), new NoopArticleSummarizer());
@@ -78,5 +80,9 @@ class WeeklyRunServiceTest {
         assertEquals(1, first.stats().failedArticles());
         assertEquals(1, second.stats().scored());
         assertEquals("再試行成功", second.summaries().values().iterator().next().shortSummary());
+    }
+    private Instant previousCompletedWeekInstant() {
+        LocalDate day=WeeklyPeriod.previousCompleted(LocalDate.now(ZoneId.of("Asia/Tokyo"))).start();
+        return day.atTime(12,0).atZone(ZoneId.of("Asia/Tokyo")).toInstant();
     }
 }

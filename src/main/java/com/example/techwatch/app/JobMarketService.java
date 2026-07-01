@@ -36,21 +36,25 @@ public class JobMarketService {
         for (JobMarketSnapshot value : imported) snapshots.save(value);
         TreeSet<LocalDate> weeks = new TreeSet<>();
         imported.forEach(value -> weeks.add(value.weekStart()));
-        weeks.add(currentWeek);
         for (LocalDate week : weeks) {
             Map<Long, List<JobMarketSnapshot>> byKeyword = snapshots.findForWeek(week).stream()
                     .collect(Collectors.groupingBy(JobMarketSnapshot::keywordId));
             for (Keyword keyword : keywordList) {
                 List<JobMarketSnapshot> values = byKeyword.getOrDefault(keyword.getId(), List.of());
+                if (values.isEmpty()) continue;
                 int us = max(values, "US");
                 int jp = max(values, "JP");
                 KeywordMarketStats value = evaluator.evaluate(keyword, week, us, jp,
-                        stats.findRecent(keyword.getId(), 12));
+                        stats.findBefore(keyword.getId(), week, 12));
                 stats.save(value);
                 if (week.equals(currentWeek)) keywords.updateMarketScore(keyword.getId(), value.globalMarketScore());
             }
         }
-        return stats.findLatestByKeyword();
+        Map<Long, KeywordMarketStats> latest = stats.findLatestByKeyword();
+        return latest.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> {
+            KeywordMarketStats value = entry.getValue();
+            return value.weekStart().isBefore(currentWeek.minusWeeks(1)) ? value.asStale() : value;
+        }, (left, right) -> left, java.util.LinkedHashMap::new));
     }
 
     private int max(List<JobMarketSnapshot> values, String region) {

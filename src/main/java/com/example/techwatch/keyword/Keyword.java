@@ -3,6 +3,7 @@ package com.example.techwatch.keyword;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.List;
 
 public class Keyword {
     private Long id;
@@ -11,6 +12,7 @@ public class Keyword {
     private final String category;
     private String status;
     private final int weight;
+    private List<String> aliases = List.of();
     private double trendScore;
     private double stabilityScore;
     private double marketScore;
@@ -94,6 +96,9 @@ public class Keyword {
     public Keyword(String name, String category, String status, int weight) {
         this(null, name, null, category, status, weight, 0, 0, 0, 0, 0, 0, null, null);
     }
+    public Keyword(String name, String category, String status, int weight, List<String> aliases) {
+        this(name, category, status, weight); setAliases(aliases);
+    }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -102,6 +107,7 @@ public class Keyword {
     public String getCategory() { return category; }
     public String getStatus() { return status; }
     public int getWeight() { return weight; }
+    public List<String> getAliases() { return aliases; }
     public double getTrendScore() { return trendScore; }
     public double getStabilityScore() { return stabilityScore; }
     public double getMarketScore() { return marketScore; }
@@ -135,6 +141,11 @@ public class Keyword {
     }
 
     public void setTrendState(String trendState) { this.trendState = Objects.requireNonNullElse(trendState, "Dormant"); }
+    public void setAliases(List<String> values) {
+        if (values == null) { aliases = List.of(); return; }
+        aliases = values.stream().filter(Objects::nonNull).map(String::trim)
+                .filter(value -> !value.isBlank() && !value.equalsIgnoreCase(name)).distinct().toList();
+    }
 
     public void applyEvaluation(KeywordEvaluationResult result) {
         this.trendScore = result.trendScore();

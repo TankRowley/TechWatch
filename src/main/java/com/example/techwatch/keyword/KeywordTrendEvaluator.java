@@ -43,9 +43,9 @@ public class KeywordTrendEvaluator {
         KeywordWeeklyStats current = ordered.get(ordered.size() - 1);
         boolean concentratedSpike = current.isObserved() && current.mentionCount() >= 3
                 && current.mentionRate() > Math.max(1, mediumRate * 2)
-                && current.sourceConcentration() >= 0.75;
+                && current.evidenceConcentration() >= 0.75;
         double buzz = concentratedSpike
-                ? clamp(35 + current.sourceConcentration() * 45 + Math.max(0, log2(momentumRatio)) * 10, 0, 100)
+                ? clamp(35 + current.evidenceConcentration() * 45 + Math.max(0, log2(momentumRatio)) * 10, 0, 100)
                 : momentumRatio > 1.5 && concentration >= 0.8 ? 35 : 0;
 
         double coverage = valid.stream().mapToDouble(KeywordWeeklyStats::collectionCoverage).average().orElse(0);
@@ -69,7 +69,7 @@ public class KeywordTrendEvaluator {
                 .filter(value -> value.weekStart().isBefore(current.weekStart())).toList();
         double priorRate = prior.stream().mapToDouble(KeywordWeeklyStats::mentionRate).average().orElse(0);
         if (current.mentionRate() > priorRate * 1.35 + 0.25
-                && (current.sourceConcentration() < 0.8 || current.officialSourceCount() > 0)) return "Rising";
+                && (current.evidenceConcentration() < 0.8 || current.officialSourceCount() > 0)) return "Rising";
         if (shortRate > mediumRate * 1.35 + 0.25 && (concentration < 0.8
                 || recent8.stream().mapToInt(KeywordWeeklyStats::officialSourceCount).sum() > 0)) return "Rising";
         if (longRate > 0.5 && shortRate < longRate * 0.65) return "Cooling";
@@ -97,7 +97,7 @@ public class KeywordTrendEvaluator {
     private double weightedConcentration(List<KeywordWeeklyStats> values) {
         int mentions = values.stream().mapToInt(KeywordWeeklyStats::mentionCount).sum();
         if (mentions <= 0) return 1;
-        return values.stream().mapToDouble(value -> value.sourceConcentration() * value.mentionCount()).sum() / mentions;
+        return values.stream().mapToDouble(value -> value.evidenceConcentration() * value.mentionCount()).sum() / mentions;
     }
 
     private double log2(double value) { return Math.log(Math.max(0.0001, value)) / Math.log(2); }

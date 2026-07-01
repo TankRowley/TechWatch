@@ -29,7 +29,7 @@ public class SafeHttpClient {
         for (int redirects = 0; ; redirects++) {
             policy.validate(current);
             HttpRequest request = HttpRequest.newBuilder(current).timeout(timeout)
-                    .header("User-Agent", "tekkunews/1.0 (+local research tool)")
+                    .header("User-Agent", "tekkunews/1.4 (+local research tool)")
                     .header("Accept", accept).GET().build();
             HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream body = response.body()) {

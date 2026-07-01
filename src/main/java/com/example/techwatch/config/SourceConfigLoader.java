@@ -25,7 +25,8 @@ public class SourceConfigLoader {
                 String name = text(item.get("name"));
                 String url = text(item.get("url"));
                 if (name.isBlank() || url.isBlank()) continue;
-                result.add(new Source(name, url, defaultText(item.get("type"), "rss"), number(item.get("trustScore"), 1)));
+                result.add(new Source(name, url, defaultText(item.get("type"), "rss"),
+                        number(item.get("trustScore"), 1), defaultText(item.get("category"), "OTHER")));
             }
             return List.copyOf(result);
         }

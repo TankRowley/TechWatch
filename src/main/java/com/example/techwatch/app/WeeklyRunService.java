@@ -42,8 +42,6 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.DayOfWeek;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -106,8 +104,9 @@ public class WeeklyRunService {
         log.accept("評価した記事: " + stats.scored() + "件");
         log.accept("検出したキーワード言及: " + stats.keywordMentions() + "件");
 
-        LocalDate endDate = LocalDate.now(APP_ZONE);
-        LocalDate startDate = endDate.minusDays(6);
+        WeeklyPeriod period = WeeklyPeriod.previousCompleted(LocalDate.now(APP_ZONE));
+        LocalDate startDate = period.start();
+        LocalDate endDate = period.end();
         Instant start = startDate.atStartOfDay(APP_ZONE).toInstant();
         Instant end = endDate.plusDays(1).atStartOfDay(APP_ZONE).toInstant();
         Map<Long, Source> sourceById = sources.stream().collect(Collectors.toMap(Source::id, Function.identity()));
@@ -116,8 +115,14 @@ public class WeeklyRunService {
         KeywordService keywordService = new KeywordService(keywordRepository, mentionRepository, new KeywordEvaluator());
         keywordService.evaluate(start, end);
 
-        LocalDate weekStart = endDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate weekStart = startDate;
         KeywordWeeklyStatsRepository weeklyStatsRepository = new KeywordWeeklyStatsRepository(database);
+        if (!weeklyStatsRepository.hasAnyStats()) {
+            int backfilled = weeklyStatsRepository.backfillHistoricalWeeks(
+                    weekStart, 52, configuredSources.size());
+            log.accept("RSSから取得できた過去記事を最大52週まで自動集計しました: "
+                    + backfilled + "週（履歴部分取得）");
+        }
         KeywordHistoryService historyService = new KeywordHistoryService(keywordRepository,
                 weeklyStatsRepository, new KeywordTrendEvaluator());
         int successfulSources = Math.max(0, configuredSources.size() - stats.failedSources());

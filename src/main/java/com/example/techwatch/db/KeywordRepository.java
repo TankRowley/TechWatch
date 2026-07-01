@@ -20,10 +20,10 @@ public class KeywordRepository {
     public Keyword save(Keyword keyword) throws SQLException {
         String now = Instant.now().toString();
         String sql = """
-                INSERT INTO keywords(name,normalized_name,category,status,weight,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?)
+                INSERT INTO keywords(name,normalized_name,category,status,weight,aliases,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,?)
                 ON CONFLICT(normalized_name) DO UPDATE SET name=excluded.name,category=excluded.category,
-                  weight=excluded.weight,updated_at=excluded.updated_at,
+                  weight=excluded.weight,aliases=excluded.aliases,updated_at=excluded.updated_at,
                   status=CASE WHEN keywords.first_seen_at IS NULL THEN excluded.status ELSE keywords.status END
                 """;
         try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -32,8 +32,8 @@ public class KeywordRepository {
             statement.setString(3, keyword.getCategory());
             statement.setString(4, keyword.getStatus());
             statement.setInt(5, keyword.getWeight());
-            statement.setString(6, now);
-            statement.setString(7, now);
+            statement.setString(6, String.join("\n", keyword.getAliases()));
+            statement.setString(7, now); statement.setString(8, now);
             statement.executeUpdate();
         }
         return findByNormalizedName(keyword.getNormalizedName());
@@ -185,7 +185,7 @@ public class KeywordRepository {
     }
 
     private Keyword map(ResultSet result) throws SQLException {
-        return new Keyword(result.getLong("id"), result.getString("name"), result.getString("normalized_name"),
+        Keyword keyword = new Keyword(result.getLong("id"), result.getString("name"), result.getString("normalized_name"),
                 result.getString("category"), result.getString("status"), result.getInt("weight"),
                 result.getDouble("trend_score"), result.getDouble("stability_score"), result.getDouble("market_score"),
                 result.getDouble("learning_value_score"), result.getDouble("buzz_risk_score"),
@@ -195,5 +195,8 @@ public class KeywordRepository {
                 result.getInt("learning") == 1, DbTime.instant(result.getString("learning_since")),
                 result.getString("learning_reason"), result.getString("trend_state"),
                 result.getDouble("activity_score"), result.getDouble("confidence_score"));
+        String aliases = result.getString("aliases");
+        keyword.setAliases(aliases == null || aliases.isBlank() ? List.of() : aliases.lines().toList());
+        return keyword;
     }
 }

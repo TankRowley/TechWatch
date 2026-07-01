@@ -136,10 +136,20 @@ public class MarkdownReportWriter {
             KeywordMarketStats value = report.marketStats().get(keyword.getId());
             out.append("### ").append(i + 1).append(". ").append(escape(keyword.getName())).append("\n\n")
                     .append("市場評価: ").append(labels.marketLabel(value.marketLabel())).append("  \n")
+                    .append("データ鮮度: ").append(marketFreshness(value)).append("  \n")
                     .append("米国求人数: ").append(value.usJobCount()).append("  \n")
                     .append("日本求人数: ").append(value.jpJobCount()).append("  \n")
                     .append("判断: ").append(marketReason(keyword, value)).append("\n\n");
         }
+    }
+
+    private String marketFreshness(KeywordMarketStats value) {
+        return switch (value.observationStatus().toUpperCase(java.util.Locale.ROOT)) {
+            case "OBSERVED" -> "観測済み";
+            case "STALE" -> "更新待ち（優先度計算には使用しない）";
+            case "MISSING" -> "欠測";
+            default -> "旧形式データ";
+        };
     }
 
     private void exploreSection(StringBuilder out, WeeklyReport report) {
@@ -205,7 +215,7 @@ public class MarkdownReportWriter {
 
     private void articleSection(StringBuilder out, String heading, WeeklyReport report, String label) {
         out.append(heading).append("\n\n");
-        List<Article> articles = report.articles().stream().filter(a -> label.equals(a.getImportanceLabel())).limit(10).toList();
+        List<Article> articles = balancedArticles(report.articles(), label, 10, 3);
         if (articles.isEmpty()) { out.append("該当記事はありません。\n\n"); return; }
         for (int i = 0; i < articles.size(); i++) {
             Article article = articles.get(i);
@@ -221,6 +231,19 @@ public class MarkdownReportWriter {
                         .append("学習優先度: ").append(labels.learningPriority(summary.learningPriority())).append("\n\n");
             }
         }
+    }
+
+    private List<Article> balancedArticles(List<Article> all, String label, int limit, int perSource) {
+        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        List<Article> selected = new java.util.ArrayList<>();
+        for (Article article : all) {
+            if (!label.equals(article.getImportanceLabel())) continue;
+            String source = article.getSourceName(); int count = counts.getOrDefault(source, 0);
+            if (count >= perSource) continue;
+            selected.add(article); counts.put(source, count + 1);
+            if (selected.size() >= limit) break;
+        }
+        return List.copyOf(selected);
     }
 
     private void keywordBullets(StringBuilder out, List<Keyword> keywords, String empty) {

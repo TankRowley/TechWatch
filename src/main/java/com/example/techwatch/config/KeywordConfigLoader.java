@@ -25,7 +25,8 @@ public class KeywordConfigLoader {
                 String name = text(item.get("name"));
                 if (name.isBlank()) continue;
                 result.add(new Keyword(name, defaultText(item.get("category"), "Other"),
-                        defaultText(item.get("status"), "Candidate"), number(item.get("weight"), 1)));
+                        defaultText(item.get("status"), "Candidate"), number(item.get("weight"), 1),
+                        strings(item.get("aliases"))));
             }
             return List.copyOf(result);
         }
@@ -36,5 +37,10 @@ public class KeywordConfigLoader {
     private static int number(Object value, int fallback) {
         if (value instanceof Number number) return number.intValue();
         try { return Integer.parseInt(text(value)); } catch (NumberFormatException ignored) { return fallback; }
+    }
+    private static List<String> strings(Object value) {
+        if (value instanceof List<?> list) return list.stream().map(KeywordConfigLoader::text)
+                .filter(text -> !text.isBlank()).toList();
+        String text = text(value); return text.isBlank() ? List.of() : List.of(text);
     }
 }
