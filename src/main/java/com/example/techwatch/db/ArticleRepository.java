@@ -84,6 +84,43 @@ public class ArticleRepository {
         return findOne(SELECT_COLUMNS + " WHERE a.url=?", url);
     }
 
+    public boolean isProcessingComplete(String url) throws SQLException {
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(
+                "SELECT processing_status FROM articles WHERE url=?")) {
+            statement.setString(1, url);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() && "COMPLETE".equals(result.getString(1));
+            }
+        }
+    }
+
+    public void markProcessing(long articleId) throws SQLException {
+        updateProcessing(articleId, "PENDING", null, true);
+    }
+
+    public void markProcessingComplete(long articleId) throws SQLException {
+        updateProcessing(articleId, "COMPLETE", null, false);
+    }
+
+    public void markProcessingFailed(long articleId, String error) throws SQLException {
+        updateProcessing(articleId, "FAILED", error, false);
+    }
+
+    private void updateProcessing(long articleId, String status, String error, boolean increment) throws SQLException {
+        String attempts = increment ? "processing_attempts=processing_attempts+1," : "";
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(
+                "UPDATE articles SET processing_status=?," + attempts
+                        + "last_processing_error=?,last_processing_at=?,updated_at=? WHERE id=?")) {
+            String now = Instant.now().toString();
+            statement.setString(1, status);
+            statement.setString(2, error == null || error.isBlank() ? null : error);
+            statement.setString(3, now);
+            statement.setString(4, now);
+            statement.setLong(5, articleId);
+            statement.executeUpdate();
+        }
+    }
+
     public Optional<Article> findById(long id) throws SQLException {
         return findOne(SELECT_COLUMNS + " WHERE a.id=?", id);
     }

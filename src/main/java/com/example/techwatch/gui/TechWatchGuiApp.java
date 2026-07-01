@@ -16,6 +16,7 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -31,6 +32,7 @@ public class TechWatchGuiApp extends Application {
     private final ExploreController explore = new ExploreController();
     private final JobMarketController jobMarket = new JobMarketController();
     private final RetentionSettingsController retention = new RetentionSettingsController();
+    private MailSettingsController mailSettings;
     private final TextArea report = textArea();
     private final TextArea logs = textArea();
     private final TabPane tabs = new TabPane();
@@ -40,6 +42,8 @@ public class TechWatchGuiApp extends Application {
 
     @Override
     public void start(Stage stage) {
+        mailSettings = new MailSettingsController(AppPaths.detect(), () -> currentResult,
+                getHostServices()::showDocument);
         BorderPane shell = new BorderPane();
         shell.getStyleClass().add("app-shell");
         shell.setTop(header());
@@ -57,7 +61,7 @@ public class TechWatchGuiApp extends Application {
         shell.setCenter(tabs);
         Scene scene = new Scene(shell, 1180, 780);
         scene.getStylesheets().add(getClass().getResource("/techwatch.css").toExternalForm());
-        stage.setTitle("TechWatch");
+        stage.setTitle("てっくにゅーす");
         stage.setMinWidth(900);
         stage.setMinHeight(620);
         stage.setScene(scene);
@@ -74,7 +78,7 @@ public class TechWatchGuiApp extends Application {
     public static void launchApp(String[] args) { launch(args); }
 
     private HBox header() {
-        Label brand = new Label("TechWatch");
+        Label brand = new Label("てっくにゅーす");
         brand.getStyleClass().add("brand");
         Label subtitle = new Label("技術の波を、学ぶ順番に変える。");
         subtitle.getStyleClass().add("subtitle");
@@ -83,9 +87,11 @@ public class TechWatchGuiApp extends Application {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Button reportButton = new Button("最新週報を開く");
         reportButton.setId("reportButton");
+        Button mailButton = new Button("Gmailで送る");
+        mailButton.setOnAction(event -> mailSettings.openGmail());
         runButton.getStyleClass().add("primary-button");
         status.getStyleClass().add("status");
-        HBox header = new HBox(14, title, spacer, status, reportButton, runButton);
+        HBox header = new HBox(14, title, spacer, status, mailButton, reportButton, runButton);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(18, 24, 18, 24));
         header.getStyleClass().add("top-bar");
@@ -135,7 +141,7 @@ public class TechWatchGuiApp extends Application {
         if (!result.logs().isEmpty()) logs.setText(String.join("\n", result.logs()));
     }
 
-    private VBox settings(Stage stage) {
+    private javafx.scene.Node settings(Stage stage) {
         AppPaths paths = AppPaths.detect();
         Label heading = new Label("設定");
         heading.getStyleClass().add("section-title");
@@ -151,12 +157,16 @@ public class TechWatchGuiApp extends Application {
                 + "\n\nキーワード候補\nconfig/keywords.yml または keywords.yml\n\n日本語AI要約"
                 + "\n\n求人市場CSV\nconfig/job-market.csv"
                 + "\n\nデータ保持設定\nconfig/retention.yml"
+                + "\n\nGmail送信先\nconfig/email.yml"
                 + "\nOPENAI_API_KEY（OpenAI利用時）\nOPENAI_MODEL（LM StudioではロードしたモデルID）"
                 + "\nOPENAI_BASE_URL（LM Studio例: http://localhost:1234/v1）");
-        VBox box = new VBox(14, heading, note, setup, retention.view(), locations);
+        VBox box = new VBox(14, heading, note, setup, mailSettings.view(), retention.view(), locations);
         box.setPadding(new Insets(24));
         VBox.setVgrow(locations, Priority.ALWAYS);
-        return box;
+        ScrollPane scroll = new ScrollPane(box);
+        scroll.setFitToWidth(true);
+        scroll.setPannable(true);
+        return scroll;
     }
 
     private void initializeForUser(Stage stage) {

@@ -6,8 +6,8 @@
 
     <groupId>com.example</groupId>
     <artifactId>techwatch</artifactId>
-    <version>1.3.0</version>
-    <name>TechWatch</name>
+    <version>1.3.1</version>
+    <name>てっくにゅーす</name>
     <description>技術情報を収集・評価し、週報として届けるデスクトップアプリ</description>
 
     <properties>

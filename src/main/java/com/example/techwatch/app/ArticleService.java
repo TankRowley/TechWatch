@@ -69,9 +69,16 @@ public class ArticleService {
                     article.setSourceId(source.id());
                     article.setSourceName(source.name());
                     Optional<Article> inserted = articleRepository.save(article);
-                    if (inserted.isEmpty()) { duplicates++; continue; }
-                    saved++;
-                    Article persisted = inserted.get();
+                    Article persisted;
+                    if (inserted.isEmpty()) {
+                        if (articleRepository.isProcessingComplete(article.getUrl())) { duplicates++; continue; }
+                        persisted = articleRepository.findByUrl(article.getUrl()).orElseThrow();
+                        log.accept("未完了の記事を再処理します: " + persisted.getTitle());
+                    } else {
+                        saved++;
+                        persisted = inserted.get();
+                    }
+                    articleRepository.markProcessing(persisted.getId());
                     List<KeywordMatch> matches = keywordExtractor.extract(persisted, keywords);
                     ArticleScore score = articleScorer.score(persisted, source, matches);
                     persisted.setArticleScore(score.score());
@@ -95,8 +102,15 @@ public class ArticleService {
                         }
                         keywordRepository.updateSeenAt(keyword.getId(), observedAt);
                     }
+                    articleRepository.markProcessingComplete(persisted.getId());
                 } catch (Exception error) {
                     failedArticles++;
+                    try {
+                        articleRepository.findByUrl(article.getUrl()).ifPresent(persisted -> {
+                            try { articleRepository.markProcessingFailed(persisted.getId(), error.toString()); }
+                            catch (Exception ignored) { }
+                        });
+                    } catch (Exception ignored) { }
                     log.accept("記事の処理に失敗: " + article.getTitle() + "（" + error.getMessage() + "）");
                 }
             }

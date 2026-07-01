@@ -24,6 +24,10 @@ public class KeywordDetailDialog {
         Label title = new Label(keyword.getName()); title.getStyleClass().add("section-title");
         content.getChildren().addAll(title, new Label("状態: " + labels.keywordStatus(keyword.getStatus())),
                 new Label("最近の動き: " + labels.trendState(keyword.getTrendState())),
+                new Label("活動度: " + number(keyword.getActivityScore())
+                        + "　長期安定: " + number(keyword.getStabilityScore())
+                        + "　信頼度: " + number(keyword.getConfidenceScore())),
+                new Label("個人優先度: " + number(keyword.getFinalScore())),
                 new Label("学習中: " + yes(keyword.isLearning()) + "　固定中: " + yes(keyword.isPinned())),
                 new Label("市場評価: " + labels.marketLabel(market == null ? "Unknown" : market.marketLabel())),
                 new Label("判断: " + reason(keyword, market)));
@@ -47,8 +51,11 @@ public class KeywordDetailDialog {
     }
 
     private String yes(boolean value) { return value ? "はい" : "いいえ"; }
+    private String number(double value) { return value == Math.rint(value) ? Long.toString(Math.round(value)) : String.format("%.1f", value); }
     private String reason(Keyword keyword, KeywordMarketStats market) {
         if (keyword.isLearning()) return "現在の学習計画を優先し、履歴と求人需要を補助材料にします。";
+        if (keyword.isFoundation()) return "短期の話題量に左右されず、IT全体の基礎として保持します。";
+        if ("Insufficient".equals(keyword.getTrendState())) return "観測期間が短いため、自動的な昇格・降格を保留します。";
         if (market != null && "Buzz Only".equals(market.marketLabel())) return "追いますが、基礎学習より優先しすぎません。";
         if (market != null && market.globalMarketScore() >= 55) return "求人需要との接続があるため、学習候補として確認します。";
         if ("Dormant".equals(keyword.getTrendState())) return "最近の出現は少ないため、必要時に確認します。";

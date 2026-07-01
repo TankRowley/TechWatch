@@ -60,6 +60,10 @@ public class Database {
             ensureColumn(connection, "articles", "archived", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "articles", "saved_by_user", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "articles", "cleanup_protected", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "articles", "processing_status", "TEXT NOT NULL DEFAULT 'PENDING'");
+            ensureColumn(connection, "articles", "processing_attempts", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "articles", "last_processing_error", "TEXT");
+            ensureColumn(connection, "articles", "last_processing_at", "TEXT");
             statement.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS article_bodies (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,6 +125,9 @@ public class Database {
             ensureColumn(connection, "keywords", "learning_since", "TEXT");
             ensureColumn(connection, "keywords", "learning_reason", "TEXT");
             ensureColumn(connection, "keywords", "trend_state", "TEXT NOT NULL DEFAULT 'Dormant'");
+            ensureColumn(connection, "keywords", "status_changed_week", "TEXT");
+            ensureColumn(connection, "keywords", "activity_score", "REAL NOT NULL DEFAULT 0");
+            ensureColumn(connection, "keywords", "confidence_score", "REAL NOT NULL DEFAULT 0");
             statement.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS keyword_mentions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,6 +203,11 @@ public class Database {
                         UNIQUE(keyword_id, week_start)
                     )
                     """);
+            ensureColumn(connection, "keyword_weekly_stats", "total_article_count", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "keyword_weekly_stats", "successful_source_count", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "keyword_weekly_stats", "configured_source_count", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "keyword_weekly_stats", "collection_status", "TEXT NOT NULL DEFAULT 'LEGACY'");
+            ensureColumn(connection, "keyword_weekly_stats", "source_concentration", "REAL NOT NULL DEFAULT 1");
             statement.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS discovered_keywords (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -268,6 +280,21 @@ public class Database {
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_keyword_market_stats ON keyword_market_stats(keyword_id,week_start)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_discovered_last_seen ON discovered_keywords(last_seen_at DESC)");
             statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_job_snapshots_fetched ON job_market_snapshots(fetched_at)");
+            statement.executeUpdate("""
+                    UPDATE keyword_weekly_stats
+                    SET total_article_count=(
+                      SELECT COUNT(*) FROM articles a
+                      WHERE date(COALESCE(a.published_at,a.fetched_at))>=date(keyword_weekly_stats.week_start)
+                        AND date(COALESCE(a.published_at,a.fetched_at))<date(keyword_weekly_stats.week_start,'+7 days')
+                    )
+                    WHERE total_article_count=0
+                    """);
+            statement.executeUpdate("""
+                    UPDATE articles SET processing_status='COMPLETE'
+                    WHERE processing_status='PENDING'
+                      AND processing_attempts=0 AND last_processing_at IS NULL
+                      AND EXISTS (SELECT 1 FROM article_summaries s WHERE s.article_id=articles.id)
+                    """);
         }
     }
 

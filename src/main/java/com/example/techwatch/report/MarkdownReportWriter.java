@@ -27,7 +27,7 @@ public class MarkdownReportWriter {
 
     public String render(WeeklyReport report) {
         StringBuilder out = new StringBuilder();
-        out.append("# TechWatch 週間レポート\n\n期間: ").append(report.periodStart()).append(" 〜 ")
+        out.append("# てっくにゅーす 週間レポート\n\n期間: ").append(report.periodStart()).append(" 〜 ")
                 .append(report.periodEnd()).append("\n\n");
         out.append("## 1. 今週の結論\n\n").append(conclusion(report)).append("\n\n");
         articleSection(out, "## 2. 必読記事", report, "Must Read");
@@ -39,10 +39,11 @@ public class MarkdownReportWriter {
         out.append("## 8. 流行疑いのキーワード\n\n");
         keywordBullets(out, report.keywords().stream().filter(k -> "Buzz".equalsIgnoreCase(k.getStatus())).toList(),
                 "流行疑いのキーワードはありません。");
-        out.append("\n## 9. 基礎技術の動き\n\n");
+        out.append("\n## 9. IT全体の地図 — 基礎技術\n\n");
         keywordBullets(out, report.keywords().stream()
-                .filter(k -> "Core".equalsIgnoreCase(k.getStatus()) && k.getTrendScore() > 0).toList(),
-                "今週、基礎技術の新しい言及は検出されませんでした。");
+                .filter(Keyword::isFoundation)
+                .sorted(Comparator.comparingDouble(Keyword::getActivityScore).reversed()).toList(),
+                "基礎技術はまだ設定されていません。");
         out.append("\n## 10. 今の自分が学ぶべきこと\n\n");
         List<Keyword> priorities = report.keywords().stream()
                 .filter(k -> k.isLearning() || k.isPinned())
@@ -100,17 +101,19 @@ public class MarkdownReportWriter {
 
     private void trendSection(StringBuilder out, WeeklyReport report) {
         out.append("## 7. 今週伸びたキーワード\n\n")
-                .append("| キーワード | 状態 | 最近の動き | 流行度 | 安定度 | バズリスク | 判断 |\n")
-                .append("|---|---|---|---:|---:|---:|---|\n");
+                .append("| キーワード | 状態 | 最近の動き | 今週言及 | 活動度 | 長期安定 | 信頼度 | バズリスク | 判断 |\n")
+                .append("|---|---|---|---:|---:|---:|---:|---:|---|\n");
         report.keywords().stream().filter(k -> k.getTrendScore() > 0)
-                .sorted(Comparator.comparingDouble(Keyword::getTrendScore).reversed()).limit(15)
+                .sorted(Comparator.comparingDouble(Keyword::getActivityScore).reversed()).limit(15)
                 .forEach(k -> out.append("| ").append(escape(k.getName())).append(" | ")
                         .append(labels.keywordStatus(k.getStatus())).append(" | ")
                         .append(labels.trendState(k.getTrendState())).append(" | ").append(number(k.getTrendScore()))
-                        .append(" | ").append(number(k.getStabilityScore())).append(" | ")
+                        .append(" | ").append(number(k.getActivityScore())).append(" | ")
+                        .append(number(k.getStabilityScore())).append(" | ")
+                        .append(number(k.getConfidenceScore())).append(" | ")
                         .append(number(k.getBuzzRiskScore())).append(" | ").append(recommendation(k)).append(" |\n"));
         if (report.keywords().stream().noneMatch(k -> k.getTrendScore() > 0)) {
-            out.append("| - | - | - | 0 | 0 | 0 | 今週の検出なし |\n");
+            out.append("| - | - | - | 0 | 0 | 0 | 0 | 0 | 今週の検出なし |\n");
         }
         out.append("\n");
     }
@@ -158,7 +161,8 @@ public class MarkdownReportWriter {
     private void coolingSection(StringBuilder out, WeeklyReport report) {
         out.append("## 14. 減速中・休眠中のキーワード\n\n");
         List<Keyword> values = report.keywords().stream()
-                .filter(keyword -> "Cooling".equals(keyword.getTrendState()) || "Dormant".equals(keyword.getTrendState()))
+                .filter(keyword -> !keyword.isFoundation()
+                        && ("Cooling".equals(keyword.getTrendState()) || "Dormant".equals(keyword.getTrendState())))
                 .limit(12).toList();
         if (values.isEmpty()) { out.append("減速中・休眠中のキーワードはありません。\n"); return; }
         for (Keyword keyword : values) {
@@ -183,7 +187,7 @@ public class MarkdownReportWriter {
     }
 
     private String historyReason(Keyword keyword) {
-        if ("Core".equals(keyword.getStatus())) return "最近の記事が少なくても、基礎技術としての重要性は維持します。";
+        if (keyword.isFoundation()) return "最近の記事が少なくても、基礎技術としての重要性は維持します。";
         if (keyword.isLearning()) return "話題量だけで学習対象から外さず、現在の学習計画を優先します。";
         if (keyword.isPinned()) return "ユーザーが固定監視しているため、自動では対象外にしません。";
         return "過去の履歴に比べ直近の出現が少ないため、監視優先度を下げます。";
@@ -191,8 +195,8 @@ public class MarkdownReportWriter {
 
     private String conclusion(WeeklyReport report) {
         long mustRead = report.articles().stream().filter(a -> "Must Read".equals(a.getImportanceLabel())).count();
-        List<String> rising = report.keywords().stream().filter(k -> k.getTrendScore() > 0)
-                .sorted(Comparator.comparingDouble(Keyword::getTrendScore).reversed()).limit(3).map(Keyword::getName).toList();
+        List<String> rising = report.keywords().stream().filter(k -> "Rising".equals(k.getTrendState()))
+                .sorted(Comparator.comparingDouble(Keyword::getActivityScore).reversed()).limit(3).map(Keyword::getName).toList();
         if (report.articles().isEmpty()) return "今週の対象記事はありません。情報源の取得状況を確認してください。";
         return "今週は" + report.articles().size() + "件を評価し、必読は" + mustRead + "件でした。"
                 + (rising.isEmpty() ? "" : " 注目キーワードは " + String.join(" / ", rising) + " です。")
@@ -227,6 +231,8 @@ public class MarkdownReportWriter {
 
     private String recommendation(Keyword keyword) {
         if (keyword.isLearning()) return "継続学習";
+        if (keyword.isFoundation()) return "基礎として維持";
+        if ("Insufficient".equals(keyword.getTrendState())) return "データ蓄積中";
         return switch (keyword.getStatus()) {
             case "Core" -> "基礎として維持";
             case "Watch" -> "継続監視";

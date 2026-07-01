@@ -41,7 +41,7 @@ public class KeywordTableController {
         root.setPadding(new Insets(20));
         Label heading = new Label("キーワードの判断");
         heading.getStyleClass().add("section-title");
-        Label guidance = new Label("流行度＝今週の話題量　安定度＝継続性　バズリスク＝話題先行の可能性。基礎・学習中・固定は別々の意味です。");
+        Label guidance = new Label("活動度＝取得記事数で補正した話題量　長期安定＝継続性　信頼度＝観測量と取得品質。基礎・学習中・固定は別々の意味です。");
         guidance.setWrapText(true);
         guidance.getStyleClass().add("guidance");
 
@@ -68,8 +68,10 @@ public class KeywordTableController {
         table.getColumns().add(column("状態", 90, k -> labels.keywordStatus(k.getStatus())));
         table.getColumns().add(column("最近の動き", 90, k -> labels.trendState(k.getTrendState())));
         table.getColumns().add(column("ミニ傾向", 80, this::miniTrend));
-        table.getColumns().add(column("流行度", 70, k -> number(k.getTrendScore())));
-        table.getColumns().add(column("安定度", 70, k -> number(k.getStabilityScore())));
+        table.getColumns().add(column("今週言及", 70, k -> number(k.getTrendScore())));
+        table.getColumns().add(column("活動度", 70, k -> number(k.getActivityScore())));
+        table.getColumns().add(column("長期安定", 75, k -> number(k.getStabilityScore())));
+        table.getColumns().add(column("信頼度", 70, k -> number(k.getConfidenceScore())));
         table.getColumns().add(column("バズリスク", 85, k -> number(k.getBuzzRiskScore())));
         table.getColumns().add(column("米国求人", 75, k -> jobs(k).usJobCount() + ""));
         table.getColumns().add(column("日本求人", 75, k -> jobs(k).jpJobCount() + ""));
@@ -164,6 +166,8 @@ public class KeywordTableController {
 
     private String recommendation(Keyword keyword) {
         if (keyword.isLearning()) return "継続学習";
+        if (keyword.isFoundation()) return "基礎として維持。最近の更新を確認";
+        if ("Insufficient".equals(keyword.getTrendState())) return "データ蓄積中。自動判断を保留";
         KeywordMarketStats market = marketStats.get(keyword.getId());
         if (market != null && "Buzz Only".equals(market.marketLabel())) return "話題先行。基礎より優先しない";
         if (market != null && market.globalMarketScore() >= 55) return "実務需要あり。学習候補";
@@ -187,6 +191,7 @@ public class KeywordTableController {
             case "Rising" -> "↗ 急上昇";
             case "Stable" -> "→ 安定";
             case "Cooling" -> "↘ 減速";
+            case "Insufficient" -> "? 蓄積中";
             default -> "– 休眠";
         };
     }

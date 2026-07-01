@@ -2,11 +2,13 @@ package com.example.techwatch.db;
 
 import com.example.techwatch.keyword.Keyword;
 import com.example.techwatch.keyword.KeywordEvaluationResult;
+import com.example.techwatch.keyword.KeywordTrendAssessment;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -117,14 +119,57 @@ public class KeywordRepository {
         }
     }
 
-    public void updateHistoryEvaluation(long keywordId, String trendState, String status) throws SQLException {
+    public LocalDate findStatusChangedWeek(long keywordId) throws SQLException {
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(
+                "SELECT status_changed_week FROM keywords WHERE id=?")) {
+            statement.setLong(1, keywordId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next() || result.getString(1) == null) return null;
+                return LocalDate.parse(result.getString(1));
+            }
+        }
+    }
+
+    public void updateHistoryEvaluation(long keywordId, String trendState, String status,
+                                        LocalDate evaluationWeek) throws SQLException {
         try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement("""
-                UPDATE keywords SET trend_state=?,status=?,updated_at=? WHERE id=?
+                UPDATE keywords SET trend_state=?,
+                  status_changed_week=CASE WHEN status<>? OR status_changed_week IS NULL THEN ? ELSE status_changed_week END,
+                  status=?,updated_at=? WHERE id=?
                 """)) {
             statement.setString(1, trendState);
             statement.setString(2, status);
-            statement.setString(3, Instant.now().toString());
-            statement.setLong(4, keywordId);
+            statement.setString(3, evaluationWeek.toString());
+            statement.setString(4, status);
+            statement.setString(5, Instant.now().toString());
+            statement.setLong(6, keywordId);
+            statement.executeUpdate();
+        }
+    }
+
+    public void updateTrendAssessment(long keywordId, KeywordTrendAssessment assessment, String status,
+                                      LocalDate evaluationWeek) throws SQLException {
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement("""
+                UPDATE keywords SET trend_state=?,activity_score=?,stability_score=?,buzz_risk_score=?,
+                  confidence_score=?,status_changed_week=CASE WHEN status<>? OR status_changed_week IS NULL
+                  THEN ? ELSE status_changed_week END,status=?,updated_at=? WHERE id=?
+                """)) {
+            statement.setString(1, assessment.state());
+            statement.setDouble(2, assessment.activityScore());
+            statement.setDouble(3, assessment.stabilityScore());
+            statement.setDouble(4, assessment.buzzRiskScore());
+            statement.setDouble(5, assessment.confidenceScore());
+            statement.setString(6, status); statement.setString(7, evaluationWeek.toString());
+            statement.setString(8, status); statement.setString(9, Instant.now().toString());
+            statement.setLong(10, keywordId); statement.executeUpdate();
+        }
+    }
+
+    public void updatePriority(long keywordId, double personalBonus, double finalScore) throws SQLException {
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(
+                "UPDATE keywords SET learning_value_score=?,final_score=?,updated_at=? WHERE id=?")) {
+            statement.setDouble(1, personalBonus); statement.setDouble(2, finalScore);
+            statement.setString(3, Instant.now().toString()); statement.setLong(4, keywordId);
             statement.executeUpdate();
         }
     }
@@ -148,6 +193,7 @@ public class KeywordRepository {
                 DbTime.instant(result.getString("last_seen_at")), result.getInt("pinned") == 1,
                 DbTime.instant(result.getString("pinned_at")), result.getString("pin_reason"),
                 result.getInt("learning") == 1, DbTime.instant(result.getString("learning_since")),
-                result.getString("learning_reason"), result.getString("trend_state"));
+                result.getString("learning_reason"), result.getString("trend_state"),
+                result.getDouble("activity_score"), result.getDouble("confidence_score"));
     }
 }

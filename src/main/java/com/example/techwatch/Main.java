@@ -11,7 +11,7 @@ public final class Main {
 
     public static void main(String[] args) {
         if (args.length > 0 && ("--help".equals(args[0]) || "-h".equals(args[0]))) {
-            System.out.println("TechWatch - 技術情報週報ジェネレーター");
+            System.out.println("てっくにゅーす - 技術情報週報ジェネレーター");
             System.out.println("Usage: java -jar techwatch.jar [run-weekly|cleanup|vacuum]");
             return;
         }
@@ -28,7 +28,7 @@ public final class Main {
                 throw new IllegalArgumentException("不明なコマンド: " + command);
             }
         } catch (Exception error) {
-            System.err.println("TechWatch failed: " + error.getMessage());
+            System.err.println("てっくにゅーすの実行に失敗しました: " + error.getMessage());
             error.printStackTrace(System.err);
             System.exit(1);
         }

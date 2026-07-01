@@ -26,6 +26,8 @@ public class Keyword {
     private Instant learningSince;
     private String learningReason;
     private String trendState;
+    private double activityScore;
+    private double confidenceScore;
 
     public Keyword(Long id, String name, String normalizedName, String category, String status, int weight,
                    double trendScore, double stabilityScore, double marketScore,
@@ -52,6 +54,17 @@ public class Keyword {
                    Instant firstSeenAt, Instant lastSeenAt, boolean pinned, Instant pinnedAt,
                    String pinReason, boolean learning, Instant learningSince, String learningReason,
                    String trendState) {
+        this(id, name, normalizedName, category, status, weight, trendScore, stabilityScore, marketScore,
+                learningValueScore, buzzRiskScore, finalScore, firstSeenAt, lastSeenAt, pinned, pinnedAt,
+                pinReason, learning, learningSince, learningReason, trendState, 0, 0);
+    }
+
+    public Keyword(Long id, String name, String normalizedName, String category, String status, int weight,
+                   double trendScore, double stabilityScore, double marketScore,
+                   double learningValueScore, double buzzRiskScore, double finalScore,
+                   Instant firstSeenAt, Instant lastSeenAt, boolean pinned, Instant pinnedAt,
+                   String pinReason, boolean learning, Instant learningSince, String learningReason,
+                   String trendState, double activityScore, double confidenceScore) {
         this.id = id;
         this.name = Objects.requireNonNullElse(name, "").trim();
         this.normalizedName = normalizedName == null || normalizedName.isBlank()
@@ -74,6 +87,8 @@ public class Keyword {
         this.learningSince = learningSince;
         this.learningReason = Objects.requireNonNullElse(learningReason, "");
         this.trendState = Objects.requireNonNullElse(trendState, "Dormant");
+        this.activityScore = activityScore;
+        this.confidenceScore = confidenceScore;
     }
 
     public Keyword(String name, String category, String status, int weight) {
@@ -102,6 +117,10 @@ public class Keyword {
     public Instant getLearningSince() { return learningSince; }
     public String getLearningReason() { return learningReason; }
     public String getTrendState() { return trendState; }
+    public double getActivityScore() { return activityScore; }
+    public double getConfidenceScore() { return confidenceScore; }
+
+    public boolean isFoundation() { return "Core".equalsIgnoreCase(status); }
 
     public void setPinned(boolean pinned, Instant pinnedAt, String pinReason) {
         this.pinned = pinned;

@@ -63,9 +63,12 @@ public class CleanupService {
         DbCounts counts = cleanupDatabase(now);
         int logs = deleteOldFiles(paths.logsDirectory(), now.minus(policy.executionLogDays(), ChronoUnit.DAYS), null);
         int html = deleteOldFiles(paths.reportsDirectory(), now.minus(policy.htmlReportDays(), ChronoUnit.DAYS), ".html");
+        int markdown = policy.keepMarkdownReports() ? 0 : deleteOldFiles(paths.reportsDirectory(),
+                now.minus(policy.htmlReportDays(), ChronoUnit.DAYS), ".md");
         if (vacuum) vacuum();
         return new CleanupResult(counts.bodyTexts(), counts.rawHtml(), counts.summaries(), counts.articles(),
-                counts.jobSnapshots(), logs, html, before, databaseSize(), vacuum);
+                counts.jobSnapshots(), logs, html, markdown, counts.weeklyStats(), counts.marketStats(),
+                before, databaseSize(), vacuum);
     }
 
     public long databaseSize() throws IOException {
@@ -93,8 +96,15 @@ public class CleanupService {
                 int oldMetadata = deleteArticles(connection, cutoff(now, policy.articleMetadataDays()), false);
                 int snapshots = executeCutoff(connection,
                         "DELETE FROM job_market_snapshots WHERE fetched_at<?", cutoff(now, policy.jobSnapshotDays()));
+                int weeklyStats = policy.keepWeeklyKeywordStats() ? 0 : executeCutoff(connection,
+                        "DELETE FROM keyword_weekly_stats WHERE week_start<?",
+                        cutoffDate(now, policy.articleMetadataDays()));
+                int marketStats = policy.keepKeywordMarketStats() ? 0 : executeCutoff(connection,
+                        "DELETE FROM keyword_market_stats WHERE week_start<?",
+                        cutoffDate(now, policy.jobSnapshotDays()));
                 connection.commit();
-                return new DbCounts(bodyTexts, rawHtml, summaries, lowPriority + oldMetadata, snapshots);
+                return new DbCounts(bodyTexts, rawHtml, summaries, lowPriority + oldMetadata, snapshots,
+                        weeklyStats, marketStats);
             } catch (Exception error) {
                 connection.rollback();
                 if (error instanceof SQLException sql) throw sql;
@@ -138,8 +148,9 @@ public class CleanupService {
 
     private int deleteArticles(Connection connection, String cutoff, boolean lowPriorityOnly) throws SQLException {
         String label = lowPriorityOnly ? " AND importance_label IN ('Ignore','Archive','UNRATED')" : "";
+        String statsReady = policy.keepWeeklyKeywordStats() ? WEEKLY_STATS_READY : "";
         String sql = "DELETE FROM articles WHERE COALESCE(published_at,fetched_at)<? AND "
-                + UNPROTECTED_ARTICLE + WEEKLY_STATS_READY + label;
+                + UNPROTECTED_ARTICLE + statsReady + label;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, cutoff);
             statement.setDouble(2, HIGH_SCORE_PROTECTION);
@@ -168,5 +179,10 @@ public class CleanupService {
 
     private String cutoff(Instant now, int days) { return now.minus(days, ChronoUnit.DAYS).toString(); }
 
-    private record DbCounts(int bodyTexts, int rawHtml, int summaries, int articles, int jobSnapshots) { }
+    private String cutoffDate(Instant now, int days) {
+        return java.time.LocalDate.ofInstant(now.minus(days, ChronoUnit.DAYS), java.time.ZoneOffset.UTC).toString();
+    }
+
+    private record DbCounts(int bodyTexts, int rawHtml, int summaries, int articles, int jobSnapshots,
+                            int weeklyStats, int marketStats) { }
 }

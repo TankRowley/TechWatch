@@ -35,7 +35,7 @@ class DatabaseMigrationTest {
             while (result.next()) columns.add(result.getString("name"));
         }
         assertTrue(columns.containsAll(Set.of("pinned", "pinned_at", "pin_reason", "learning", "learning_since",
-                "learning_reason", "trend_state")));
+                "learning_reason", "trend_state", "status_changed_week", "activity_score", "confidence_score")));
         Set<String> tables = new HashSet<>();
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + path);
              var statement = connection.createStatement();
@@ -45,11 +45,20 @@ class DatabaseMigrationTest {
         assertTrue(tables.containsAll(Set.of("article_bodies", "keyword_weekly_stats", "discovered_keywords",
                 "discovered_keyword_mentions", "job_market_snapshots", "keyword_market_stats")));
 
+        Set<String> weeklyColumns = new HashSet<>();
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + path);
+             var statement = connection.createStatement(); var result = statement.executeQuery("PRAGMA table_info(keyword_weekly_stats)")) {
+            while (result.next()) weeklyColumns.add(result.getString("name"));
+        }
+        assertTrue(weeklyColumns.containsAll(Set.of("total_article_count", "successful_source_count",
+                "configured_source_count", "collection_status", "source_concentration")));
+
         Set<String> articleColumns = new HashSet<>();
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + path);
              var statement = connection.createStatement(); var result = statement.executeQuery("PRAGMA table_info(articles)")) {
             while (result.next()) articleColumns.add(result.getString("name"));
         }
-        assertTrue(articleColumns.containsAll(Set.of("archived", "saved_by_user", "cleanup_protected")));
+        assertTrue(articleColumns.containsAll(Set.of("archived", "saved_by_user", "cleanup_protected",
+                "processing_status", "processing_attempts", "last_processing_error", "last_processing_at")));
     }
 }

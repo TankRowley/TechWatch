@@ -7,6 +7,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $inputDir = Join-Path $root 'package-input'
 $distDir = Join-Path $root 'dist'
 $stagingDir = Join-Path $root 'package-output'
+$productName = -join ([char[]](0x3066, 0x3063, 0x304f, 0x306b, 0x3085, 0x30fc, 0x3059))
 
 function Remove-WorkspaceDirectory([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return }
@@ -46,9 +47,9 @@ try {
         '--type', $type,
         '--input', $inputDir,
         '--dest', $(if ($Installer) { $distDir } else { $stagingDir }),
-        '--name', 'TechWatch',
-        '--app-version', '1.3.0',
-        '--vendor', 'TechWatch',
+        '--name', $productName,
+        '--app-version', '1.3.1',
+        '--vendor', $productName,
         '--description', '技術情報を収集・評価し、週報として届けるアプリ',
         '--main-jar', 'techwatch-gui.jar',
         '--main-class', 'com.example.techwatch.gui.GuiLauncher',
@@ -65,8 +66,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'jpackage failed.' }
 
     if (-not $Installer) {
-        $appHome = Join-Path $distDir 'TechWatch'
-        $stagedAppHome = Join-Path $stagingDir 'TechWatch'
+        $appHome = Join-Path $distDir $productName
+        $stagedAppHome = Join-Path $stagingDir $productName
+        $legacyAppHome = Join-Path $distDir 'TechWatch'
         try {
             Remove-WorkspaceDirectory $appHome
         } catch {
@@ -83,8 +85,10 @@ try {
         Copy-Item -LiteralPath (Join-Path $root 'keywords.yml') -Destination (Join-Path $appHome 'config\keywords.yml')
         Copy-Item -LiteralPath (Join-Path $root 'job-market.csv') -Destination (Join-Path $appHome 'config\job-market.csv')
         Copy-Item -LiteralPath (Join-Path $root 'retention.yml') -Destination (Join-Path $appHome 'config\retention.yml')
+        Copy-Item -LiteralPath (Join-Path $root 'src\main\resources\defaults\email.yml') -Destination (Join-Path $appHome 'config\email.yml')
+        Remove-WorkspaceDirectory $legacyAppHome
         Remove-WorkspaceDirectory $stagingDir
-        Write-Host "Created: $(Join-Path $appHome 'TechWatch.exe')"
+        Write-Host "Created: $(Join-Path $appHome ($productName + '.exe'))"
     }
 } finally {
     Pop-Location

@@ -46,7 +46,10 @@ public class RetentionSettingsController {
                     + "日 / 実行ログ: " + policy.executionLogDays() + "日\n"
                     + "未採用記事: " + policy.unselectedArticleDays() + "日 / 記事メタデータ・AI要約: "
                     + policy.articleMetadataDays() + "日 / 求人詳細: " + policy.jobSnapshotDays() + "日\n"
-                    + "Markdown週報・週次キーワード統計・市場統計: 永続保存");
+                    + "Markdown週報: " + retention(policy.keepMarkdownReports(), policy.htmlReportDays())
+                    + " / 週次キーワード統計: "
+                    + retention(policy.keepWeeklyKeywordStats(), policy.articleMetadataDays())
+                    + " / 市場統計: " + retention(policy.keepKeywordMarketStats(), policy.jobSnapshotDays()));
         } catch (Exception error) {
             policyText.setText("保持設定を読み込めません: " + error.getMessage());
         }
@@ -90,4 +93,6 @@ public class RetentionSettingsController {
         if (bytes < 1024 * 1024) return String.format(Locale.JAPAN, "%.1f KB", bytes / 1024.0);
         return String.format(Locale.JAPAN, "%.1f MB", bytes / 1024.0 / 1024.0);
     }
+
+    private String retention(boolean keep, int days) { return keep ? "永続保存" : days + "日"; }
 }

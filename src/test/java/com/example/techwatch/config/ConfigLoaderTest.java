@@ -41,7 +41,7 @@ class ConfigLoaderTest {
 
         assertEquals(45, policy.articleBodyDays());
         assertEquals(14, policy.executionLogDays());
-        assertEquals(365, policy.articleMetadataDays());
+        assertEquals(730, policy.articleMetadataDays());
         assertTrue(policy.keepMarkdownReports());
     }
 
@@ -50,7 +50,7 @@ class ConfigLoaderTest {
         System.setProperty("techwatch.packaged", "true");
         try {
             Path home = AppPaths.detect().home();
-            assertTrue(home.endsWith("TechWatch") || home.endsWith(".techwatch"));
+            assertTrue(home.endsWith("てっくにゅーす") || home.endsWith("TechWatch") || home.endsWith(".techwatch"));
             assertTrue(!home.equals(Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize()));
         } finally {
             System.clearProperty("techwatch.packaged");

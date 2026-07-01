@@ -17,12 +17,12 @@ public class KeywordTrendChartController {
     private final StackPane root = new StackPane(chart, empty);
 
     public KeywordTrendChartController() {
-        chart.setTitle("週ごとの記事出現数");
+        chart.setTitle("週ごとの記事言及率");
         chart.setLegendVisible(false);
         chart.setAnimated(false);
         chart.setCreateSymbols(true);
         ((CategoryAxis) chart.getXAxis()).setLabel("週");
-        ((NumberAxis) chart.getYAxis()).setLabel("記事出現数");
+        ((NumberAxis) chart.getYAxis()).setLabel("取得記事に占める割合（%）");
         chart.setPrefHeight(260);
     }
 
@@ -31,8 +31,10 @@ public class KeywordTrendChartController {
         chart.getData().clear();
         if (values == null || values.isEmpty()) { chart.setVisible(false); empty.setVisible(true); return; }
         XYChart.Series<String, Number> series = new XYChart.Series<>();
-        series.setName("記事出現数");
-        values.forEach(value -> series.getData().add(new XYChart.Data<>(value.weekStart().toString(), value.mentionCount())));
+        series.setName("記事言及率");
+        values.stream().filter(KeywordWeeklyStats::isObserved).forEach(value ->
+                series.getData().add(new XYChart.Data<>(value.weekStart().toString(), value.mentionRate())));
+        if (series.getData().isEmpty()) { chart.setVisible(false); empty.setVisible(true); return; }
         chart.getData().add(series); chart.setVisible(true); empty.setVisible(false);
     }
 }

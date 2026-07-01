@@ -23,7 +23,7 @@ public class KeywordChartDataService {
         market = new KeywordMarketStatsRepository(database);
     }
 
-    public List<KeywordWeeklyStats> trend(long keywordId) throws Exception { return weekly.findRecent(keywordId, 12); }
+    public List<KeywordWeeklyStats> trend(long keywordId) throws Exception { return weekly.findRecent(keywordId, 52); }
     public List<KeywordMarketStats> market(long keywordId) throws Exception { return market.findRecent(keywordId, 12); }
 
     public List<String> relatedArticles(long keywordId) throws Exception {

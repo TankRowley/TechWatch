@@ -16,7 +16,7 @@ public record RetentionPolicy(int articleBodyDays, int rawHtmlDays, int executio
     }
 
     public static RetentionPolicy defaults() {
-        return new RetentionPolicy(60, 30, 30, 180, 365, 365, 365, true, true, true);
+        return new RetentionPolicy(90, 30, 90, 365, 730, 730, 730, true, true, true);
     }
 
     private static int nonNegative(int value) { return Math.max(0, value); }

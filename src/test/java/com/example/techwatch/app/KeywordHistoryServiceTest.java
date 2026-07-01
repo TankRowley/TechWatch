@@ -32,6 +32,14 @@ class KeywordHistoryServiceTest {
         assertEquals("Core", repository.findByNormalizedName(core.getNormalizedName()).getStatus());
         assertEquals("Watch", repository.findByNormalizedName(learning.getNormalizedName()).getStatus());
         assertEquals("Watch", repository.findByNormalizedName(pinned.getNormalizedName()).getStatus());
-        assertEquals("Decline", repository.findByNormalizedName(ordinary.getNormalizedName()).getStatus());
+        assertEquals("Watch", repository.findByNormalizedName(ordinary.getNormalizedName()).getStatus());
+
+        var service = new KeywordHistoryService(repository, new KeywordWeeklyStatsRepository(database),
+                new KeywordTrendEvaluator());
+        service.captureAndEvaluate(LocalDate.of(2026, 6, 29));
+        assertEquals("Watch", repository.findByNormalizedName(ordinary.getNormalizedName()).getStatus());
+
+        service.captureAndEvaluate(LocalDate.of(2026, 7, 27));
+        assertEquals("Watch", repository.findByNormalizedName(ordinary.getNormalizedName()).getStatus());
     }
 }

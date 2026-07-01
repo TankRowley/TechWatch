@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Test and package
+        run: mvn -B clean verify
+      - name: Verify distributable jars
+        shell: bash
+        run: |
+          test -f target/techwatch.jar
+          test -f target/techwatch-gui.jar
+          ! find target -type f \( -name 'techwatch.db' -o -name '*.log' \) | grep -q .
+          grep -Eq 'recipient:[[:space:]]*""' target/classes/defaults/email.yml

@@ -52,7 +52,7 @@ public class FirstRunSetupDialog {
             UserSetupSelection current = service.load();
             Dialog<UserSetupSelection> dialog = new Dialog<>();
             dialog.initOwner(owner);
-            dialog.setTitle("TechWatch 初期設定");
+            dialog.setTitle("てっくにゅーす 初期設定");
             dialog.setHeaderText(firstRun ? "あなた向けの週報を作るため、最初に3つだけ教えてください。"
                     : "学習中・固定・興味領域を見直します。");
             ButtonType save = new ButtonType("保存して開始", ButtonBar.ButtonData.OK_DONE);

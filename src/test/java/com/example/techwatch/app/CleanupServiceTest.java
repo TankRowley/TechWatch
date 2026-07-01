@@ -74,20 +74,20 @@ class CleanupServiceTest {
                 Clock.fixed(NOW, ZoneOffset.UTC));
         CleanupResult result = service.cleanup();
 
-        assertEquals(1, result.bodyTextsCleared());
+        assertEquals(0, result.bodyTextsCleared());
         assertEquals(1, result.rawHtmlCleared());
-        assertEquals(1, result.summariesDeleted());
-        assertEquals(2, result.articlesDeleted());
-        assertEquals(1, result.jobSnapshotsDeleted());
+        assertEquals(0, result.summariesDeleted());
+        assertEquals(1, result.articlesDeleted());
+        assertEquals(0, result.jobSnapshotsDeleted());
         assertEquals(1, result.logFilesDeleted());
-        assertEquals(1, result.htmlReportsDeleted());
+        assertEquals(0, result.htmlReportsDeleted());
         assertFalse(Files.exists(oldLog));
         assertTrue(Files.exists(recentLog));
-        assertFalse(Files.exists(oldHtml));
+        assertTrue(Files.exists(oldHtml));
         assertTrue(Files.exists(oldMarkdown));
 
         try (Connection connection = database.connect()) {
-            assertFalse(existsByTitle(connection, "delete"));
+            assertTrue(existsByTitle(connection, "delete"));
             assertFalse(existsByTitle(connection, "aggregated"));
             assertTrue(existsByTitle(connection, "high"));
             assertTrue(existsByTitle(connection, "saved"));
@@ -96,8 +96,37 @@ class CleanupServiceTest {
             assertTrue(existsByTitle(connection, "missing-stats"));
             assertEquals(1, count(connection, "keyword_weekly_stats"));
             assertEquals(1, count(connection, "keyword_market_stats"));
-            assertEquals(0, count(connection, "article_bodies"));
-            assertEquals(1, scalar(connection, "SELECT archived FROM articles WHERE title='body'"));
+            assertEquals(1, count(connection, "article_bodies"));
+            assertEquals(0, scalar(connection, "SELECT archived FROM articles WHERE title='body'"));
+        }
+    }
+
+    @Test
+    void removesOptionalHistoryWhenRetentionFlagsAreDisabled() throws Exception {
+        AppPaths paths = new AppPaths(temp);
+        paths.ensureDirectories();
+        Database database = new Database(paths.database());
+        database.initialize();
+        try (Connection connection = database.connect()) {
+            long keyword = keyword(connection, "Optional History", false);
+            weeklyStats(connection, keyword, LocalDate.of(2025, 1, 6));
+            marketStats(connection, keyword);
+        }
+        Path markdown = Files.writeString(paths.reportsDirectory().resolve("old.md"), "old");
+        Files.setLastModifiedTime(markdown, FileTime.from(NOW.minusSeconds(400L * 86_400)));
+        RetentionPolicy policy = new RetentionPolicy(60, 30, 30, 180, 365, 365, 365,
+                false, false, false);
+
+        CleanupResult result = new CleanupService(database, paths, policy,
+                Clock.fixed(NOW, ZoneOffset.UTC)).cleanup();
+
+        assertEquals(1, result.markdownReportsDeleted());
+        assertEquals(1, result.weeklyKeywordStatsDeleted());
+        assertEquals(1, result.keywordMarketStatsDeleted());
+        assertFalse(Files.exists(markdown));
+        try (Connection connection = database.connect()) {
+            assertEquals(0, count(connection, "keyword_weekly_stats"));
+            assertEquals(0, count(connection, "keyword_market_stats"));
         }
     }
 
@@ -152,7 +181,7 @@ class CleanupServiceTest {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO keyword_market_stats(keyword_id,week_start,created_at,updated_at) VALUES(?,?,?,?)
                 """)) {
-            statement.setLong(1, keywordId); statement.setString(2, "2026-06-29");
+            statement.setLong(1, keywordId); statement.setString(2, "2025-01-06");
             statement.setString(3, NOW.toString()); statement.setString(4, NOW.toString()); statement.executeUpdate();
         }
     }

@@ -1,25 +1,40 @@
 package com.example.techwatch.body;
 
-import org.jsoup.Connection;
+import com.example.techwatch.net.SafeHttpClient;
+import com.example.techwatch.net.UrlSafetyPolicy;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
+import java.io.ByteArrayInputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.function.Function;
 
 public class SimpleBodyExtractor implements BodyExtractor {
     private final Function<String, Document> documentLoader;
 
     public SimpleBodyExtractor() {
-        this(url -> {
+        this(defaultLoader());
+    }
+
+    private static Function<String, Document> defaultLoader() {
+        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(12))
+                .followRedirects(HttpClient.Redirect.NEVER).build();
+        SafeHttpClient safeClient = new SafeHttpClient(client, new UrlSafetyPolicy(), 2_000_000, 5);
+        return url -> {
             try {
-                Connection connection = Jsoup.connect(url).userAgent("TechWatch/1.0 (+local research tool)")
-                        .timeout(15_000).maxBodySize(2_000_000).followRedirects(true);
-                return connection.get();
+                SafeHttpClient.Response response = safeClient.get(URI.create(url),
+                        "text/html,application/xhtml+xml", Duration.ofSeconds(15));
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    throw new IllegalStateException("HTTP " + response.statusCode());
+                }
+                return Jsoup.parse(new ByteArrayInputStream(response.body()), null, response.finalUri().toString());
             } catch (Exception error) {
                 throw new BodyLoadException(error);
             }
-        });
+        };
     }
 
     public SimpleBodyExtractor(Function<String, Document> documentLoader) { this.documentLoader = documentLoader; }

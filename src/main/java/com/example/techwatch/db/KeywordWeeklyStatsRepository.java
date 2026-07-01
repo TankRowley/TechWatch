@@ -9,7 +9,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class KeywordWeeklyStatsRepository {
     private static final ZoneId APP_ZONE = ZoneId.of("Asia/Tokyo");
@@ -18,8 +20,17 @@ public class KeywordWeeklyStatsRepository {
     public KeywordWeeklyStatsRepository(Database database) { this.database = database; }
 
     public void capture(LocalDate weekStart) throws SQLException {
+        capture(weekStart, 0, 0);
+    }
+
+    public void capture(LocalDate weekStart, int successfulSources, int configuredSources) throws SQLException {
         Instant start = weekStart.atStartOfDay(APP_ZONE).toInstant();
         Instant end = weekStart.plusDays(7).atStartOfDay(APP_ZONE).toInstant();
+        Map<Long, Double> concentration = sourceConcentration(start, end);
+        int totalArticles = totalArticles(start, end);
+        String collectionStatus = configuredSources <= 0 ? "LEGACY"
+                : successfulSources <= 0 ? "MISSING"
+                : successfulSources < configuredSources ? "PARTIAL" : "SUCCESS";
         String sql = """
                 WITH matched AS (
                   SELECT DISTINCT m.keyword_id,m.article_id
@@ -44,13 +55,47 @@ public class KeywordWeeklyStatsRepository {
             statement.setString(1, start.toString()); statement.setString(2, end.toString());
             statement.setString(3, weekStart.toString()); statement.setString(4, weekStart.plusDays(7).toString());
             try (ResultSet result = statement.executeQuery()) {
-                while (result.next()) captured.add(new KeywordWeeklyStats(result.getLong("keyword_id"), weekStart,
+                while (result.next()) {
+                    long keywordId = result.getLong("keyword_id");
+                    captured.add(new KeywordWeeklyStats(keywordId, weekStart,
                         result.getInt("mention_count"), result.getInt("source_count"),
                         result.getInt("official_source_count"), result.getInt("high_score_article_count"),
-                        result.getInt("report_included_count"), result.getDouble("average_article_score")));
+                        result.getInt("report_included_count"), result.getDouble("average_article_score"),
+                        totalArticles, successfulSources, configuredSources, collectionStatus,
+                        concentration.getOrDefault(keywordId, 1.0)));
+                }
             }
         }
         for (KeywordWeeklyStats value : captured) save(value);
+    }
+
+    private int totalArticles(Instant start, Instant end) throws SQLException {
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(
+                "SELECT COUNT(*) FROM articles WHERE COALESCE(published_at,fetched_at)>=? AND COALESCE(published_at,fetched_at)<?")) {
+            statement.setString(1, start.toString());
+            statement.setString(2, end.toString());
+            try (ResultSet result = statement.executeQuery()) { return result.next() ? result.getInt(1) : 0; }
+        }
+    }
+
+    private Map<Long, Double> sourceConcentration(Instant start, Instant end) throws SQLException {
+        Map<Long, Double> values = new HashMap<>();
+        String sql = """
+                SELECT keyword_id,MAX(source_mentions)*1.0/SUM(source_mentions) concentration
+                FROM (
+                  SELECT m.keyword_id,a.source_id,COUNT(DISTINCT m.article_id) source_mentions
+                  FROM keyword_mentions m JOIN articles a ON a.id=m.article_id
+                  WHERE m.observed_at>=? AND m.observed_at<?
+                  GROUP BY m.keyword_id,a.source_id
+                ) GROUP BY keyword_id
+                """;
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, start.toString()); statement.setString(2, end.toString());
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) values.put(result.getLong("keyword_id"), result.getDouble("concentration"));
+            }
+        }
+        return values;
     }
 
     public void save(KeywordWeeklyStats stats) throws SQLException {
@@ -58,18 +103,53 @@ public class KeywordWeeklyStatsRepository {
         try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO keyword_weekly_stats(keyword_id,week_start,mention_count,source_count,
                   official_source_count,high_score_article_count,report_included_count,average_article_score,
-                  created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)
+                  total_article_count,successful_source_count,configured_source_count,collection_status,
+                  source_concentration,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(keyword_id,week_start) DO UPDATE SET mention_count=excluded.mention_count,
                   source_count=excluded.source_count,official_source_count=excluded.official_source_count,
                   high_score_article_count=excluded.high_score_article_count,
                   report_included_count=excluded.report_included_count,
-                  average_article_score=excluded.average_article_score,updated_at=excluded.updated_at
+                  average_article_score=excluded.average_article_score,
+                  total_article_count=excluded.total_article_count,
+                  successful_source_count=excluded.successful_source_count,
+                  configured_source_count=excluded.configured_source_count,
+                  collection_status=excluded.collection_status,
+                  source_concentration=excluded.source_concentration,updated_at=excluded.updated_at
                 """)) {
             statement.setLong(1, stats.keywordId()); statement.setString(2, stats.weekStart().toString());
             statement.setInt(3, stats.mentionCount()); statement.setInt(4, stats.sourceCount());
             statement.setInt(5, stats.officialSourceCount()); statement.setInt(6, stats.highScoreArticleCount());
             statement.setInt(7, stats.reportIncludedCount()); statement.setDouble(8, stats.averageArticleScore());
-            statement.setString(9, now); statement.setString(10, now); statement.executeUpdate();
+            statement.setInt(9, stats.totalArticleCount()); statement.setInt(10, stats.successfulSourceCount());
+            statement.setInt(11, stats.configuredSourceCount()); statement.setString(12, stats.collectionStatus());
+            statement.setDouble(13, stats.sourceConcentration());
+            statement.setString(14, now); statement.setString(15, now); statement.executeUpdate();
+        }
+    }
+
+    public void refreshReportIncludedCounts(LocalDate weekStart) throws SQLException {
+        Instant start = weekStart.atStartOfDay(APP_ZONE).toInstant();
+        Instant end = weekStart.plusDays(7).atStartOfDay(APP_ZONE).toInstant();
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement("""
+                UPDATE keyword_weekly_stats
+                SET report_included_count=(
+                  SELECT COUNT(DISTINCT km.article_id)
+                  FROM keyword_mentions km
+                  JOIN report_items ri ON ri.article_id=km.article_id
+                  JOIN weekly_reports wr ON wr.id=ri.report_id
+                  WHERE km.keyword_id=keyword_weekly_stats.keyword_id
+                    AND km.observed_at>=? AND km.observed_at<?
+                    AND wr.report_date>=? AND wr.report_date<?
+                ),updated_at=?
+                WHERE week_start=?
+                """)) {
+            statement.setString(1, start.toString());
+            statement.setString(2, end.toString());
+            statement.setString(3, weekStart.toString());
+            statement.setString(4, weekStart.plusDays(7).toString());
+            statement.setString(5, Instant.now().toString());
+            statement.setString(6, weekStart.toString());
+            statement.executeUpdate();
         }
     }
 
@@ -85,10 +165,23 @@ public class KeywordWeeklyStatsRepository {
         return values;
     }
 
+    public List<KeywordWeeklyStats> findSince(long keywordId, LocalDate firstWeek) throws SQLException {
+        List<KeywordWeeklyStats> values = new ArrayList<>();
+        try (var connection = database.connect(); PreparedStatement statement = connection.prepareStatement(
+                "SELECT * FROM keyword_weekly_stats WHERE keyword_id=? AND week_start>=? ORDER BY week_start")) {
+            statement.setLong(1, keywordId); statement.setString(2, firstWeek.toString());
+            try (ResultSet result = statement.executeQuery()) { while (result.next()) values.add(map(result)); }
+        }
+        return values;
+    }
+
     private KeywordWeeklyStats map(ResultSet result) throws SQLException {
         return new KeywordWeeklyStats(result.getLong("keyword_id"), LocalDate.parse(result.getString("week_start")),
                 result.getInt("mention_count"), result.getInt("source_count"),
                 result.getInt("official_source_count"), result.getInt("high_score_article_count"),
-                result.getInt("report_included_count"), result.getDouble("average_article_score"));
+                result.getInt("report_included_count"), result.getDouble("average_article_score"),
+                result.getInt("total_article_count"), result.getInt("successful_source_count"),
+                result.getInt("configured_source_count"), result.getString("collection_status"),
+                result.getDouble("source_concentration"));
     }
 }

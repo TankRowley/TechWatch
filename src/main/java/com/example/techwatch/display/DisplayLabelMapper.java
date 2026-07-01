@@ -42,6 +42,7 @@ public class DisplayLabelMapper {
             case "Stable" -> "安定";
             case "Cooling" -> "減速";
             case "Dormant" -> "休眠";
+            case "Insufficient" -> "データ蓄積中";
             default -> safe(value);
         };
     }

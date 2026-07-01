@@ -19,7 +19,9 @@ public final class AppPaths {
         if ((configured == null || configured.isBlank()) && isPackagedApplication()) {
             String localAppData = System.getenv("LOCALAPPDATA");
             if (localAppData != null && !localAppData.isBlank()) {
-                configured = Path.of(localAppData).resolve("TechWatch").toString();
+                Path current = Path.of(localAppData).resolve("てっくにゅーす");
+                Path legacy = Path.of(localAppData).resolve("TechWatch");
+                configured = (!Files.exists(current) && Files.exists(legacy) ? legacy : current).toString();
             } else {
                 configured = Path.of(System.getProperty("user.home"), ".techwatch").toString();
             }
@@ -43,6 +45,7 @@ public final class AppPaths {
     public Path keywordConfig() throws IOException { return ensureConfig("keywords.yml"); }
     public Path jobMarketCsv() throws IOException { return ensureConfig("job-market.csv"); }
     public Path retentionConfig() throws IOException { return ensureConfig("retention.yml"); }
+    public Path mailConfig() throws IOException { return ensureConfig("email.yml"); }
 
     public void ensureDirectories() throws IOException {
         Files.createDirectories(home);

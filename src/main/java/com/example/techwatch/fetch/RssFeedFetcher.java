@@ -2,6 +2,8 @@ package com.example.techwatch.fetch;
 
 import com.example.techwatch.article.Article;
 import com.example.techwatch.source.Source;
+import com.example.techwatch.net.SafeHttpClient;
+import com.example.techwatch.net.UrlSafetyPolicy;
 import com.rometools.rome.feed.synd.SyndEntry;
 import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.io.SyndFeedInput;
@@ -11,31 +13,29 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 public class RssFeedFetcher implements FeedFetcher {
-    private final HttpClient httpClient;
+    private final SafeHttpClient httpClient;
 
     public RssFeedFetcher() {
-        this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(12)).followRedirects(HttpClient.Redirect.NORMAL).build());
+        this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(12))
+                .followRedirects(HttpClient.Redirect.NEVER).build());
     }
 
-    public RssFeedFetcher(HttpClient httpClient) { this.httpClient = httpClient; }
+    public RssFeedFetcher(HttpClient httpClient) {
+        this.httpClient = new SafeHttpClient(httpClient, new UrlSafetyPolicy(), 5_000_000, 5);
+    }
 
     @Override
     public FeedFetchResult fetch(Source source) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(source.url()))
-                    .timeout(Duration.ofSeconds(20))
-                    .header("User-Agent", "TechWatch/1.0 (+local research tool)")
-                    .header("Accept", "application/rss+xml, application/atom+xml, application/xml, text/xml, */*")
-                    .GET().build();
-            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            SafeHttpClient.Response response = httpClient.get(URI.create(source.url()),
+                    "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+                    Duration.ofSeconds(20));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 return FeedFetchResult.failure("HTTP " + response.statusCode());
             }

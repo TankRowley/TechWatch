@@ -117,15 +117,18 @@ public class WeeklyRunService {
         keywordService.evaluate(start, end);
 
         LocalDate weekStart = endDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        KeywordWeeklyStatsRepository weeklyStatsRepository = new KeywordWeeklyStatsRepository(database);
         KeywordHistoryService historyService = new KeywordHistoryService(keywordRepository,
-                new KeywordWeeklyStatsRepository(database), new KeywordTrendEvaluator());
-        keywords = historyService.captureAndEvaluate(weekStart);
-        log.accept("過去26週の履歴から最近の動きを評価しました");
+                weeklyStatsRepository, new KeywordTrendEvaluator());
+        int successfulSources = Math.max(0, configuredSources.size() - stats.failedSources());
+        keywords = historyService.captureAndEvaluate(weekStart, successfulSources, configuredSources.size());
+        log.accept("取得品質と言及率を含む過去104週の履歴から最近の動きを評価しました");
 
         JobMarketService jobMarketService = new JobMarketService(new ManualCsvJobMarketSource(),
                 new JobMarketSnapshotRepository(database), new KeywordMarketStatsRepository(database),
                 keywordRepository, new KeywordMarketEvaluator());
         Map<Long, KeywordMarketStats> marketStats = jobMarketService.refresh(paths.jobMarketCsv(), keywords, weekStart);
+        keywords = new KeywordPriorityService(keywordRepository).evaluate(keywords, marketStats);
         log.accept("求人市場CSVを評価しました: " + marketStats.values().stream()
                 .filter(value -> value.usJobCount() > 0 || value.jpJobCount() > 0).count() + "キーワード");
 
@@ -139,6 +142,7 @@ public class WeeklyRunService {
                 new ReportRepository(database), new MarkdownReportWriter());
         ReportService.ReportOutput report = reportService.generate(startDate, endDate, start, end,
                 paths.reportsDirectory(), discovered, marketStats);
+        weeklyStatsRepository.refreshReportIncludedCounts(weekStart);
         log.accept("週報を生成しました: " + report.path());
         try {
             CleanupResult cleanup = new CleanupService(database, paths,
